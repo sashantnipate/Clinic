@@ -1,5 +1,6 @@
 import AppSidebar from "@/feature/side-layout/app-sidebar";
 import { Header } from "@/feature/side-layout/header";
+import { SidebarProvider } from "@/feature/side-layout/sidebar-context";
 
 export default function DashboardLayout({
   children,
@@ -7,16 +8,18 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-background">
-      <Header />
+    <SidebarProvider>
+      <div className="min-h-screen bg-background">
+        <Header />
 
-      <div className="mx-auto flex max-w-7xl pt-16 px-6">
-        <AppSidebar />
+        <div className="mx-auto flex max-w-7xl pt-16 px-4 sm:px-6 lg:px-8">
+          <AppSidebar />
 
-        <main className="flex-1 p-6">
-          {children}
-        </main>
+          <main className="flex-1 p-6 transition-all duration-300">
+            {children}
+          </main>
+        </div>
       </div>
-    </div>
+    </SidebarProvider>
   );
 }

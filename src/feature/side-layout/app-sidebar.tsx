@@ -13,9 +13,12 @@ import {
   UserRound,
   Users,
 } from "lucide-react";
+import { useSidebar } from "./sidebar-context";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { cn } from "@/lib/utils";
 
 const items = [
-  // { title: "Dashboard", icon: LayoutDashboard, href: "/dashboard" },
+  { title: "Dashboard", icon: LayoutDashboard, href: "/" },
   { title: "Patients", icon: Users, href: "/patients" },
   { title: "Medical Records", icon: FileText, href: "/medical-records" },
   { title: "Appointments", icon: Calendar, href: "/appointments" },
@@ -28,10 +31,26 @@ const items = [
 
 export default function AppSidebar() {
   const pathname = usePathname();
+  const { isCollapsed, toggleSidebar } = useSidebar();
+  const isMobile = useIsMobile();
+
+  const handleLinkClick = () => {
+    // Only close the sidebar on link click if the user is on a mobile screen
+    if (isMobile) {
+      toggleSidebar();
+    }
+  };
 
   return (
-    <aside className="w-64 bg-background">
-      <div className="p-4">
+    <aside
+      className={cn(
+        "bg-background transition-all duration-300 ease-in-out shrink-0 overflow-hidden",
+        isCollapsed 
+          ? "w-0 opacity-0 pointer-events-none" 
+          : "w-64 opacity-100"
+      )}
+    >
+      <div className="py-4 px-4 w-64">
         <nav className="space-y-1">
           {items.map((item) => {
             const isActive = pathname === item.href;
@@ -40,14 +59,16 @@ export default function AppSidebar() {
               <Link
                 key={item.title}
                 href={item.href}
-                className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all duration-200 ${
+                onClick={handleLinkClick}
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all duration-200 w-full",
                   isActive
                     ? "bg-card border shadow-sm"
-                    : "hover:bg-accent"
-                }`}
+                    : "hover:bg-accent hover:text-accent-foreground"
+                )}
               >
-                <item.icon className="h-4 w-4" />
-                <span>{item.title}</span>
+                <item.icon className="h-5 w-5 shrink-0" />
+                <span className="truncate">{item.title}</span>
               </Link>
             );
           })}
