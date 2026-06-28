@@ -47,10 +47,10 @@ export default function AppSidebar() {
         "bg-background transition-all duration-300 ease-in-out shrink-0 overflow-hidden",
         isCollapsed 
           ? "w-0 opacity-0 pointer-events-none" 
-          : "w-64 opacity-100"
+          : "w-60 opacity-100"
       )}
     >
-      <div className="py-4 px-4 w-64">
+      <div className="py-4 px-4 w-60">
         <nav className="space-y-1">
           {items.map((item) => {
             const isActive = pathname === item.href;
