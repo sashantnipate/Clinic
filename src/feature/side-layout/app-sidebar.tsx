@@ -20,7 +20,7 @@ import { cn } from "@/lib/utils";
 const items = [
   { title: "Dashboard", icon: LayoutDashboard, href: "/" },
   { title: "Patients", icon: Users, href: "/patients" },
-  { title: "Medical Records", icon: FileText, href: "/medical-records" },
+  { title: "Custom Forms", icon: FileText, href: "/forms" },
   { title: "Appointments", icon: Calendar, href: "/appointments" },
   { title: "Doctors", icon: UserRound, href: "/doctors" },
   { title: "Billing", icon: CreditCard, href: "/billing" },

@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Plus, CalendarIcon } from "lucide-react";
+import { Plus, CalendarIcon, Trash2, PlusCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 import {
@@ -31,48 +31,120 @@ interface PatientFormModalProps {
   onAddPatient?: (patient: any) => void;
 }
 
+interface CustomField {
+  id: string;
+  label: string;
+  type: "text" | "number" | "textarea" | "select";
+  required: boolean;
+  options?: string[];
+}
+
+interface CustomSection {
+  id: string;
+  title: string;
+  fields: CustomField[];
+}
+
 export function PatientFormModal({ onAddPatient }: PatientFormModalProps) {
   const [open, setOpen] = useState(false);
   const [calendarOpen, setCalendarOpen] = useState(false);
-  const [gender, setGender] = useState<string>("male");
+  const [gender, setGender] = useState<"male" | "female" | "other">("male");
   const [date, setDate] = useState<Date | undefined>(undefined);
 
+  // Core model-defined variables only
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     phone: "",
     address: "",
-    notes: "",
-    emergencyName: "",
-    emergencyPhone: "",
-    emergencyRelation: "",
   });
+
+  // Structural dynamic tracking state for custom sections & fields
+  const [customSections, setCustomSections] = useState<CustomSection[]>([]);
+  
+  // Captures inputted transactional data from dynamically rendered components
+  const [customData, setCustomData] = useState<Record<string, any>>({});
+
+  const handleAddSection = () => {
+    const sectionTitle = prompt("Enter section name (e.g., Lifestyle Information):");
+    if (!sectionTitle) return;
+
+    const newSection: CustomSection = {
+      id: `sec_${Math.random().toString(36).substr(2, 9)}`,
+      title: sectionTitle,
+      fields: [],
+    };
+    setCustomSections((prev) => [...prev, newSection]);
+  };
+
+  const handleAddField = (sectionId: string) => {
+    const label = prompt("Enter field display name (e.g., Blood Type):");
+    if (!label) return;
+
+    const type = prompt("Enter input type ('text', 'number', 'textarea', 'select'):") as any;
+    if (!["text", "number", "textarea", "select"].includes(type)) {
+      alert("Invalid field variant type configured.");
+      return;
+    }
+
+    let options: string[] = [];
+    if (type === "select") {
+      const rawOptions = prompt("Enter comma-separated dropdown values (e.g., A+, O-, B+):");
+      if (rawOptions) {
+        options = rawOptions.split(",").map((opt) => opt.trim());
+      }
+    }
+
+    const newField: CustomField = {
+      id: `field_${Math.random().toString(36).substr(2, 9)}`,
+      label,
+      type,
+      required: false,
+      options: options.length > 0 ? options : undefined,
+    };
+
+    setCustomSections((prev) =>
+      prev.map((sec) =>
+        sec.id === sectionId ? { ...sec, fields: [...sec.fields, newField] } : sec
+      )
+    );
+  };
+
+  const handleRemoveSection = (sectionId: string) => {
+    setCustomSections((prev) => prev.filter((sec) => sec.id !== sectionId));
+  };
+
+  const handleCustomValueChange = (fieldId: string, value: any) => {
+    setCustomData((prev) => ({ ...prev, [fieldId]: value }));
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (!date) {
+      alert("Please select a valid date of birth.");
+      return;
+    }
+
     if (onAddPatient) {
       onAddPatient({
         id: Math.random().toString(36).substr(2, 9),
-        ...formData,
-        dob: date ? date.toLocaleDateString() : "",
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        address: formData.address || undefined,
+        dob: date,
         gender,
-        status: "Active",
+        customSections,
+        customData,
         createdAt: new Date().toLocaleDateString(),
       });
     }
 
-    // Reset Form
-    setFormData({
-      name: "",
-      email: "",
-      phone: "",
-      address: "",
-      notes: "",
-      emergencyName: "",
-      emergencyPhone: "",
-      emergencyRelation: "",
-    });
+    // Reset components to initial states
+    setFormData({ name: "", email: "", phone: "", address: "" });
+    setCustomSections([]);
+    setCustomData({});
     setDate(undefined);
     setGender("male");
     setOpen(false);
@@ -96,7 +168,7 @@ export function PatientFormModal({ onAddPatient }: PatientFormModalProps) {
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Section 1: Primary Information */}
+          {/* Section 1: Core Mongoose Data Fields Only */}
           <div className="space-y-4">
             <h3 className="text-sm font-semibold tracking-wide text-primary uppercase border-b pb-2">
               Primary Details
@@ -136,7 +208,6 @@ export function PatientFormModal({ onAddPatient }: PatientFormModalProps) {
                 />
               </div>
 
-              {/* Shrunk Date of Birth from 8 columns down to 4 to mirror the layout of other fields */}
               <div className="col-span-12 md:col-span-4 grid gap-1.5">
                 <Label htmlFor="dob">Date of Birth</Label>
                 <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
@@ -144,6 +215,7 @@ export function PatientFormModal({ onAddPatient }: PatientFormModalProps) {
                     <Button
                       variant="outline"
                       id="dob"
+                      type="button"
                       className={cn(
                         "h-10 justify-start text-left font-normal px-3 bg-background",
                         !date && "text-muted-foreground"
@@ -171,7 +243,7 @@ export function PatientFormModal({ onAddPatient }: PatientFormModalProps) {
 
               <div className="col-span-12 md:col-span-4 grid gap-1.5">
                 <Label htmlFor="gender">Gender</Label>
-                <Select value={gender} onValueChange={setGender}>
+                <Select value={gender} onValueChange={(v: any) => setGender(v)}>
                   <SelectTrigger id="gender" className="h-10">
                     <SelectValue placeholder="Select" />
                   </SelectTrigger>
@@ -197,62 +269,89 @@ export function PatientFormModal({ onAddPatient }: PatientFormModalProps) {
             </div>
           </div>
 
-          {/* Section 2: Emergency Contact (Marked explicitly as Optional) */}
-          <div className="space-y-4">
-            <h3 className="text-sm font-semibold tracking-wide text-primary uppercase border-b pb-2">
-              Emergency Contact <span className="text-muted-foreground font-normal text-xs lowercase normal-case">(Optional)</span>
-            </h3>
-            
-            <div className="grid grid-cols-12 gap-4">
-              <div className="col-span-12 md:col-span-4 grid gap-1.5">
-                <Label htmlFor="emergencyName">Contact Name</Label>
-                <Input
-                  id="emergencyName"
-                  className="h-10"
-                  value={formData.emergencyName}
-                  onChange={(e) => setFormData({ ...formData, emergencyName: e.target.value })}
-                />
+          {/* Dynamic Sections and Fields Render Engine */}
+          {customSections.map((section) => (
+            <div key={section.id} className="space-y-4 pt-2 border-t border-dashed">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold tracking-wide text-primary uppercase">
+                  {section.title}
+                </h3>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 text-xs gap-1"
+                    onClick={() => handleAddField(section.id)}
+                  >
+                    <PlusCircle className="h-3.5 w-3.5" /> Add Field
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-destructive hover:bg-destructive/10"
+                    onClick={() => handleRemoveSection(section.id)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
-              <div className="col-span-12 md:col-span-4 grid gap-1.5">
-                <Label htmlFor="emergencyPhone">Contact Phone</Label>
-                <Input
-                  id="emergencyPhone"
-                  type="tel"
-                  className="h-10"
-                  value={formData.emergencyPhone}
-                  onChange={(e) => setFormData({ ...formData, emergencyPhone: e.target.value })}
-                />
-              </div>
-              <div className="col-span-12 md:col-span-4 grid gap-1.5">
-                <Label htmlFor="emergencyRelation">Relationship</Label>
-                <Input
-                  id="emergencyRelation"
-                  className="h-10"
-                  value={formData.emergencyRelation}
-                  onChange={(e) => setFormData({ ...formData, emergencyRelation: e.target.value })}
-                />
-              </div>
-            </div>
-          </div>
 
-          {/* Section 3: Clinical Notes Area for Doctors */}
-          <div className="space-y-4">
-            <h3 className="text-sm font-semibold tracking-wide text-primary uppercase border-b pb-2">
-              Clinical Context
-            </h3>
-            <div className="grid col-span-12 gap-1.5">
-              <Label htmlFor="notes">
-                Patient Notes / Chief Complaint <span className="text-muted-foreground font-normal text-xs">(Optional)</span>
-              </Label>
-              {/* Uses standard shadcn base text input structural style configured as a multi-line textarea */}
-              <textarea
-                id="notes"
-                rows={3}
-                className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 dark:bg-background"
-                value={formData.notes}
-                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-              />
+              <div className="grid grid-cols-12 gap-4">
+                {section.fields.map((field) => (
+                  <div key={field.id} className="col-span-12 md:col-span-4 grid gap-1.5">
+                    <Label htmlFor={field.id}>{field.label}</Label>
+                    
+                    {field.type === "textarea" ? (
+                      <textarea
+                        id={field.id}
+                        rows={2}
+                        className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring dark:bg-background"
+                        value={customData[field.id] || ""}
+                        onChange={(e) => handleCustomValueChange(field.id, e.target.value)}
+                      />
+                    ) : field.type === "select" ? (
+                      <Select
+                        value={customData[field.id] || ""}
+                        onValueChange={(v) => handleCustomValueChange(field.id, v)}
+                      >
+                        <SelectTrigger id={field.id} className="h-10">
+                          <SelectValue placeholder="Select choice" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {field.options?.map((opt) => (
+                            <SelectItem key={opt} value={opt}>
+                              {opt}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Input
+                        id={field.id}
+                        type={field.type}
+                        className="h-10"
+                        value={customData[field.id] || ""}
+                        onChange={(e) => handleCustomValueChange(field.id, e.target.value)}
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
+          ))}
+
+          {/* Interactive Actions Zone */}
+          <div className="pt-2 flex justify-start">
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full border-dashed gap-2 h-11"
+              onClick={handleAddSection}
+            >
+              <Plus className="h-4 w-4" /> Add Custom Field Section
+            </Button>
           </div>
 
           <DialogFooter className="pt-6 border-t gap-3 flex items-center justify-end bg-transparent">

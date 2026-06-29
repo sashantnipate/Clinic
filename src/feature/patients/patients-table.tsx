@@ -1,4 +1,3 @@
-// src/feature/patients/patients-table.tsx
 "use client";
 
 import React, { useState, useMemo } from "react";
