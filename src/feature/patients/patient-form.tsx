@@ -1,8 +1,7 @@
-// src/feature/patients/patient-form.tsx
 "use client";
 
-import React, { useState } from "react";
-import { Plus, CalendarIcon, Trash2, PlusCircle } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { Plus, CalendarIcon, Trash2, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 import {
@@ -26,6 +25,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { getRegistrationSections } from "@/lib/actions/section.actions";
+import { createPatientRecord } from "@/lib/actions/patient.actions";
 
 interface PatientFormModalProps {
   onAddPatient?: (patient: any) => void;
@@ -48,10 +49,15 @@ interface CustomSection {
 export function PatientFormModal({ onAddPatient }: PatientFormModalProps) {
   const [open, setOpen] = useState(false);
   const [calendarOpen, setCalendarOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  
+  // Database Templates
+  const [availableSections, setAvailableSections] = useState<any[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
+
   const [gender, setGender] = useState<"male" | "female" | "other">("male");
   const [date, setDate] = useState<Date | undefined>(undefined);
 
-  // Core model-defined variables only
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -59,66 +65,79 @@ export function PatientFormModal({ onAddPatient }: PatientFormModalProps) {
     address: "",
   });
 
-  // Structural dynamic tracking state for custom sections & fields
   const [customSections, setCustomSections] = useState<CustomSection[]>([]);
-  
-  // Captures inputted transactional data from dynamically rendered components
   const [customData, setCustomData] = useState<Record<string, any>>({});
 
-  const handleAddSection = () => {
-    const sectionTitle = prompt("Enter section name (e.g., Lifestyle Information):");
-    if (!sectionTitle) return;
-
-    const newSection: CustomSection = {
-      id: `sec_${Math.random().toString(36).substr(2, 9)}`,
-      title: sectionTitle,
-      fields: [],
-    };
-    setCustomSections((prev) => [...prev, newSection]);
+  const getBrowserToken = () => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("clinic_jwt") || "";
+    }
+    return "";
   };
 
-  const handleAddField = (sectionId: string) => {
-    const label = prompt("Enter field display name (e.g., Blood Type):");
-    if (!label) return;
+  useEffect(() => {
+    async function loadTemplates() {
+      if (!open) return;
+      try {
+        const token = getBrowserToken();
+        const result = await getRegistrationSections(token);
+        if (result.success) {
+          // Only show active templates
+          setAvailableSections(result.sections.filter((s: any) => s.isActive) || []);
+        }
+      } catch (err) {
+        console.error("Failed to load registration sections", err);
+      }
+    }
+    loadTemplates();
+  }, [open]);
 
-    const type = prompt("Enter input type ('text', 'number', 'textarea', 'select'):") as any;
-    if (!["text", "number", "textarea", "select"].includes(type)) {
-      alert("Invalid field variant type configured.");
+  const handleAddSectionFromTemplate = () => {
+    if (!selectedTemplateId) return;
+    
+    const template = availableSections.find(s => s._id === selectedTemplateId);
+    if (!template) return;
+
+    if (customSections.some(sec => sec.id === template._id)) {
+      alert("This section has already been added.");
       return;
     }
 
-    let options: string[] = [];
-    if (type === "select") {
-      const rawOptions = prompt("Enter comma-separated dropdown values (e.g., A+, O-, B+):");
-      if (rawOptions) {
-        options = rawOptions.split(",").map((opt) => opt.trim());
-      }
-    }
-
-    const newField: CustomField = {
-      id: `field_${Math.random().toString(36).substr(2, 9)}`,
-      label,
-      type,
-      required: false,
-      options: options.length > 0 ? options : undefined,
+    const newSection: CustomSection = {
+      id: template._id,
+      title: template.title,
+      fields: template.fields.map((f: any) => ({
+        id: `field_${Math.random().toString(36).substr(2, 9)}`,
+        label: f.label,
+        type: f.type,
+        required: f.required,
+        options: f.options,
+      })),
     };
 
-    setCustomSections((prev) =>
-      prev.map((sec) =>
-        sec.id === sectionId ? { ...sec, fields: [...sec.fields, newField] } : sec
-      )
-    );
+    setCustomSections((prev) => [...prev, newSection]);
+    setSelectedTemplateId(""); // Reset selection
   };
 
   const handleRemoveSection = (sectionId: string) => {
     setCustomSections((prev) => prev.filter((sec) => sec.id !== sectionId));
+    
+    // Clean up customData associated with the removed section
+    const sectionToRemove = customSections.find(s => s.id === sectionId);
+    if (sectionToRemove) {
+      setCustomData(prev => {
+        const newData = { ...prev };
+        sectionToRemove.fields.forEach(field => delete newData[field.id]);
+        return newData;
+      });
+    }
   };
 
   const handleCustomValueChange = (fieldId: string, value: any) => {
     setCustomData((prev) => ({ ...prev, [fieldId]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!date) {
@@ -126,29 +145,57 @@ export function PatientFormModal({ onAddPatient }: PatientFormModalProps) {
       return;
     }
 
-    if (onAddPatient) {
-      onAddPatient({
-        id: Math.random().toString(36).substr(2, 9),
-        name: formData.name,
-        email: formData.email,
-        phone: formData.phone,
-        address: formData.address || undefined,
-        dob: date,
-        gender,
-        customSections,
-        customData,
-        createdAt: new Date().toLocaleDateString(),
-      });
-    }
+    setIsSaving(true);
 
-    // Reset components to initial states
-    setFormData({ name: "", email: "", phone: "", address: "" });
-    setCustomSections([]);
-    setCustomData({});
-    setDate(undefined);
-    setGender("male");
-    setOpen(false);
+    const payload = {
+      name: formData.name,
+      email: formData.email,
+      phone: formData.phone,
+      address: formData.address || undefined,
+      dob: date,
+      gender,
+      customSections,
+      customData,
+    };
+
+    try {
+      const token = getBrowserToken();
+      const result = await createPatientRecord(token, payload);
+
+      if (result.success && onAddPatient) {
+        // Map DB record to local table state format to update UI instantly
+        onAddPatient({
+          id: result.patient._id,
+          name: result.patient.name,
+          email: result.patient.email,
+          phone: result.patient.phone,
+          dob: new Date(result.patient.dob).toISOString(),
+          gender: result.patient.gender,
+          createdAt: new Date(result.patient.createdAt).toLocaleDateString(),
+        });
+        
+        // Reset state
+        setFormData({ name: "", email: "", phone: "", address: "" });
+        setCustomSections([]);
+        setCustomData({});
+        setDate(undefined);
+        setGender("male");
+        setOpen(false);
+      } else {
+        alert(result.error || "Failed to save patient.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("An unexpected error occurred.");
+    } finally {
+      setIsSaving(false);
+    }
   };
+
+  // Determine unadded sections for the dropdown
+  const unaddedSections = availableSections.filter(
+    (s) => !customSections.some((cs) => cs.id === s._id)
+  );
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -168,7 +215,6 @@ export function PatientFormModal({ onAddPatient }: PatientFormModalProps) {
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Section 1: Core Mongoose Data Fields Only */}
           <div className="space-y-4">
             <h3 className="text-sm font-semibold tracking-wide text-primary uppercase border-b pb-2">
               Primary Details
@@ -269,43 +315,35 @@ export function PatientFormModal({ onAddPatient }: PatientFormModalProps) {
             </div>
           </div>
 
-          {/* Dynamic Sections and Fields Render Engine */}
+          {/* Rendered Template Sections */}
           {customSections.map((section) => (
-            <div key={section.id} className="space-y-4 pt-2 border-t border-dashed">
-              <div className="flex items-center justify-between">
+            <div key={section.id} className="space-y-4 pt-2">
+              <div className="flex items-center justify-between border-b pb-2">
                 <h3 className="text-sm font-semibold tracking-wide text-primary uppercase">
                   {section.title}
                 </h3>
-                <div className="flex items-center gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-8 text-xs gap-1"
-                    onClick={() => handleAddField(section.id)}
-                  >
-                    <PlusCircle className="h-3.5 w-3.5" /> Add Field
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-destructive hover:bg-destructive/10"
-                    onClick={() => handleRemoveSection(section.id)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 text-destructive hover:bg-destructive/10 -my-1"
+                  onClick={() => handleRemoveSection(section.id)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
               </div>
 
               <div className="grid grid-cols-12 gap-4">
                 {section.fields.map((field) => (
                   <div key={field.id} className="col-span-12 md:col-span-4 grid gap-1.5">
-                    <Label htmlFor={field.id}>{field.label}</Label>
+                    <Label htmlFor={field.id}>
+                      {field.label} {field.required && <span className="text-red-500">*</span>}
+                    </Label>
                     
                     {field.type === "textarea" ? (
                       <textarea
                         id={field.id}
+                        required={field.required}
                         rows={2}
                         className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring dark:bg-background"
                         value={customData[field.id] || ""}
@@ -313,6 +351,7 @@ export function PatientFormModal({ onAddPatient }: PatientFormModalProps) {
                       />
                     ) : field.type === "select" ? (
                       <Select
+                        required={field.required}
                         value={customData[field.id] || ""}
                         onValueChange={(v) => handleCustomValueChange(field.id, v)}
                       >
@@ -331,6 +370,7 @@ export function PatientFormModal({ onAddPatient }: PatientFormModalProps) {
                       <Input
                         id={field.id}
                         type={field.type}
+                        required={field.required}
                         className="h-10"
                         value={customData[field.id] || ""}
                         onChange={(e) => handleCustomValueChange(field.id, e.target.value)}
@@ -342,15 +382,37 @@ export function PatientFormModal({ onAddPatient }: PatientFormModalProps) {
             </div>
           ))}
 
-          {/* Interactive Actions Zone */}
-          <div className="pt-2 flex justify-start">
+          {/* Template Selector Tool */}
+          <div className="pt-4 flex flex-col sm:flex-row items-start sm:items-center gap-3 border-t border-dashed">
+            <Select 
+              value={selectedTemplateId} 
+              onValueChange={setSelectedTemplateId}
+            >
+              <SelectTrigger className="w-full sm:w-[300px] mt-4 h-10">
+                <SelectValue placeholder="Select a section template to add..." />
+              </SelectTrigger>
+              <SelectContent>
+                {unaddedSections.length === 0 ? (
+                  <SelectItem value="none" disabled>
+                    {availableSections.length === 0 ? "No templates found" : "All templates added"}
+                  </SelectItem>
+                ) : (
+                  unaddedSections.map((s) => (
+                    <SelectItem key={s._id} value={s._id}>
+                      {s.title}
+                    </SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
             <Button
               type="button"
-              variant="outline"
-              className="w-full border-dashed gap-2 h-11"
-              onClick={handleAddSection}
+              variant="secondary"
+              className="w-full sm:w-auto mt-0 sm:mt-4 h-10"
+              onClick={handleAddSectionFromTemplate}
+              disabled={!selectedTemplateId || selectedTemplateId === "none"}
             >
-              <Plus className="h-4 w-4" /> Add Custom Field Section
+              <Plus className="h-4 w-4 mr-2" /> Add Template
             </Button>
           </div>
 
@@ -360,14 +422,22 @@ export function PatientFormModal({ onAddPatient }: PatientFormModalProps) {
               variant="outline" 
               className="px-5 h-10"
               onClick={() => setOpen(false)}
+              disabled={isSaving}
             >
               Cancel
             </Button>
             <Button 
               type="submit"
               className="px-5 h-10"
+              disabled={isSaving}
             >
-              Save Patient
+              {isSaving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...
+                </>
+              ) : (
+                "Save Patient"
+              )}
             </Button>
           </DialogFooter>
         </form>

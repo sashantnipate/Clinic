@@ -1,7 +1,21 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { ChevronDown, MoreHorizontal, ArrowUpDown, Filter, Eye, Edit, Trash2, X, Plus, Phone, Mail, Calendar as CalendarIcon } from "lucide-react";
+import { 
+  ChevronDown, 
+  MoreHorizontal, 
+  ArrowUpDown, 
+  Filter, 
+  Eye, 
+  Edit, 
+  Trash2, 
+  X, 
+  Plus, 
+  Phone, 
+  Mail, 
+  Calendar as CalendarIcon,
+  Loader2 
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
 import {
@@ -27,6 +41,22 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 
+// Import shadcn Dialog components for custom modals
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+
+import { deletePatientRecord } from "@/lib/actions/patient.actions";
+import { PatientFormModal } from "./patient-form";
+
 export interface Patient {
   id: string;
   name: string;
@@ -35,17 +65,26 @@ export interface Patient {
   dob: string;
   gender: string;
   createdAt: string;
+  customSections?: any;
+  customData?: any;
 }
 
 interface PatientsTableProps {
   patients: Patient[];
+  onUpdatePatient: (updatedPatient: Patient) => void;
+  onDeletePatient: (id: string) => void;
 }
 
-export function PatientsTable({ patients }: PatientsTableProps) {
-  // Global View & Sorting States
+export function PatientsTable({ patients, onUpdatePatient, onDeletePatient }: PatientsTableProps) {
+  // Global View, Modals, & Sorting States
   const [globalSearch, setGlobalSearch] = useState("");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc" | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  
+  // Custom Shadcn Modal States
+  const [patientToDelete, setPatientToDelete] = useState<Patient | null>(null);
+  const [patientToEdit, setPatientToEdit] = useState<Patient | null>(null);
   
   // Pagination Configuration
   const [currentPage, setCurrentPage] = useState(1);
@@ -59,12 +98,34 @@ export function PatientsTable({ patients }: PatientsTableProps) {
   const [contactFilter, setContactFilter] = useState("");
   const [regDateFilter, setRegDateFilter] = useState("");
 
-  // Column Visibility States (Pills)
+  // Column Visibility States
   const [visibleColumns, setVisibleColumns] = useState({
     genderAge: true,
     contactInfo: true,
     regDate: true,
   });
+
+  // Confirmed Server Actions Execution Lifecycle
+  const handleConfirmedDelete = async () => {
+    if (!patientToDelete) return;
+    const targetId = patientToDelete.id;
+
+    try {
+      setDeletingId(targetId);
+      const token = localStorage.getItem("clinic_jwt") || "";
+      const result = await deletePatientRecord(token, targetId);
+
+      if (result.success) {
+        onDeletePatient(targetId);
+        setSelectedIds((prev) => prev.filter((id) => id !== targetId));
+      }
+    } catch (error) {
+      console.error("Deletion process error: ", error);
+    } finally {
+      setDeletingId(null);
+      setPatientToDelete(null);
+    }
+  };
 
   const parseAge = (dobString: string) => {
     if (!dobString) return null;
@@ -174,7 +235,7 @@ export function PatientsTable({ patients }: PatientsTableProps) {
         />
       </div>
 
-      {/* Interactive Column Visibility Pills (Hidden on small mobile viewports for clean spacing) */}
+      {/* Interactive Column Visibility Pills */}
       <div className="hidden sm:flex flex-wrap items-center gap-2 pb-2">
         <span className="text-xs font-medium text-muted-foreground mr-1 uppercase tracking-wider">Visible Columns:</span>
         <ColumnTogglePill 
@@ -194,7 +255,7 @@ export function PatientsTable({ patients }: PatientsTableProps) {
         />
       </div>
 
-      {/* 📱 Mobile and Tablet Layout Mode View (Cards stack vertically) */}
+      {/* 📱 Mobile and Tablet Layout Mode View */}
       <div className="grid grid-cols-1 gap-3 md:hidden">
         {paginatedPatients.length === 0 ? (
           <div className="rounded-md border p-8 text-center text-muted-foreground text-sm bg-card">
@@ -213,7 +274,6 @@ export function PatientsTable({ patients }: PatientsTableProps) {
                   isSelected && "border-primary bg-primary/5"
                 )}
               >
-                {/* Top header row inside the patient profile card block */}
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-3">
                     <Checkbox 
@@ -232,11 +292,14 @@ export function PatientsTable({ patients }: PatientsTableProps) {
                     </div>
                   </div>
 
-                  {/* Actions Dropdown Trigger matching the actions grid panel structure */}
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 p-0 rounded-md">
-                        <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
+                      <Button variant="ghost" size="icon" className="h-8 w-8 p-0 rounded-md" disabled={deletingId === patient.id}>
+                        {deletingId === patient.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                        ) : (
+                          <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
+                        )}
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-44">
@@ -245,18 +308,20 @@ export function PatientsTable({ patients }: PatientsTableProps) {
                       <DropdownMenuItem className="gap-2 cursor-pointer">
                         <Eye className="h-4 w-4 text-muted-foreground" /> View Chart
                       </DropdownMenuItem>
-                      <DropdownMenuItem className="gap-2 cursor-pointer">
+                      <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => setPatientToEdit(patient)}>
                         <Edit className="h-4 w-4 text-muted-foreground" /> Edit Profile
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem className="gap-2 text-destructive focus:text-destructive focus:bg-destructive/10 cursor-pointer">
+                      <DropdownMenuItem 
+                        onClick={() => setPatientToDelete(patient)}
+                        className="gap-2 text-destructive focus:text-destructive focus:bg-destructive/10 cursor-pointer"
+                      >
                         <Trash2 className="h-4 w-4" /> Delete Records
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
 
-                {/* Patient Contact & Registration Date Grid Details */}
                 <div className="grid grid-cols-2 gap-2 pt-2 border-t text-xs text-muted-foreground">
                   <div className="space-y-1">
                     <div className="flex items-center gap-1.5 text-foreground">
@@ -282,7 +347,7 @@ export function PatientsTable({ patients }: PatientsTableProps) {
         )}
       </div>
 
-      {/* 💻 Desktop Viewport Layout Mode Container (Hidden entirely on mobile/tablets) */}
+      {/* 💻 Desktop Viewport Layout Mode Container */}
       <div className="hidden md:block rounded-md border bg-card max-h-[600px] overflow-y-auto relative shadow-2xs">
         <Table>
           <TableHeader className="sticky top-0 z-10 bg-card border-b shadow-xs">
@@ -456,8 +521,12 @@ export function PatientsTable({ patients }: PatientsTableProps) {
                     <TableCell className="py-3 text-right">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0 hover:bg-muted rounded-md">
-                            <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
+                          <Button variant="ghost" className="h-8 w-8 p-0 hover:bg-muted rounded-md" disabled={deletingId === patient.id}>
+                            {deletingId === patient.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                            ) : (
+                              <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
+                            )}
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-44">
@@ -466,11 +535,14 @@ export function PatientsTable({ patients }: PatientsTableProps) {
                           <DropdownMenuItem className="gap-2 cursor-pointer">
                             <Eye className="h-4 w-4 text-muted-foreground" /> View Chart
                           </DropdownMenuItem>
-                          <DropdownMenuItem className="gap-2 cursor-pointer">
+                          <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => setPatientToEdit(patient)}>
                             <Edit className="h-4 w-4 text-muted-foreground" /> Edit Profile
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem className="gap-2 text-destructive focus:text-destructive focus:bg-destructive/10 cursor-pointer">
+                          <DropdownMenuItem 
+                            onClick={() => setPatientToDelete(patient)}
+                            className="gap-2 text-destructive focus:text-destructive focus:bg-destructive/10 cursor-pointer"
+                          >
                             <Trash2 className="h-4 w-4" /> Delete Records
                           </DropdownMenuItem>
                         </DropdownMenuContent>
@@ -526,6 +598,43 @@ export function PatientsTable({ patients }: PatientsTableProps) {
           </Button>
         </div>
       </div>
+
+      {/* 🛑 SHADCN ALERT DIALOG MODAL FOR DELETIONS */}
+      <AlertDialog open={!!patientToDelete} onOpenChange={(open) => !open && setPatientToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the clinical records for{" "}
+              <strong className="text-foreground">{patientToDelete?.name}</strong>. This operational action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleConfirmedDelete} 
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete Record
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* 📝 SHADCN DIALOG FOR EDIT PROFILE MODAL */}
+      <Dialog open={!!patientToEdit} onOpenChange={(open) => !open && setPatientToEdit(null)}>
+        <DialogContent className="sm:max-w-[600px] p-0 border-none bg-transparent">
+          {patientToEdit && (
+            <PatientFormModal 
+              patientToEdit={patientToEdit} 
+              onUpdatePatient={(updatedPatient) => {
+                onUpdatePatient(updatedPatient);
+                setPatientToEdit(null);
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
