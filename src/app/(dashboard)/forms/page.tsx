@@ -1,77 +1,53 @@
-// src/app/forms/page.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useClerk } from "@clerk/nextjs";
 import { CreateSectionModal } from "@/feature/forms/create-section-modal";
-import { ListPlus, CheckCircle2, XCircle, FileSpreadsheet, Calendar, Edit2, Trash2, Power, Loader2 } from "lucide-react";
-import { saveRegistrationSection } from "@/lib/actions/section.actions";
-import { verifyAndFetchWorkspace } from "@/lib/actions/auth.actions";
+import { FileSpreadsheet, Calendar, Edit2, Trash2, Loader2, LayoutGrid, Type, Hash, AlignLeft, ChevronDown, Search, Eye, EyeOff } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { Toggle } from "@/components/ui/toggle";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Input } from "@/components/ui/input";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { 
+  saveRegistrationSection, 
+  getRegistrationSections, 
+  deleteRegistrationSection 
+} from "@/lib/actions/section.actions";
 
 export default function FormsDashboardPage() {
-  const { signOut } = useClerk();
-  
-  const [activeOrgId, setActiveOrgId] = useState<string>("");
   const [sectionsList, setSectionsList] = useState<any[]>([]);
-  
-  const [isVerifying, setIsVerifying] = useState(true);
-  const [isLoadingSections, setIsLoadingSections] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isLoadingSections, setIsLoadingSections] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingSection, setEditingSection] = useState<any | null>(null);
-  const [retryCount, setRetryCount] = useState(0);
 
-  useEffect(() => {
-    async function enforceSessionSync() {
-      try {
-        setIsVerifying(true);
-        const result = await verifyAndFetchWorkspace();
-
-        // CATCH 1: True Authorization failure -> Force push logout
-        if (!result.success && result.authError) {
-          console.warn("Security policy violation. Executing forced logout...");
-          await signOut({ redirectUrl: "/sign-in" });
-          return;
-        }
-
-        // CATCH 2: Webhook database synchronization race condition handler
-        if (!result.success && result.retry && retryCount < 5) {
-          console.log("Database record synchronization in progress. Retrying step...");
-          setTimeout(() => setRetryCount(prev => prev + 1), 1500);
-          return;
-        }
-
-        // SUCCESS: Native data is ready and verified
-        if (result.success && result.ownerOrgId) {
-          setActiveOrgId(result.ownerOrgId);
-        }
-      } catch (err) {
-        console.error("Auth layer exception handler:", err);
-      } finally {
-        setIsVerifying(false);
-      }
+  const getBrowserToken = () => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("clinic_jwt") || "";
     }
-    enforceSessionSync();
-  }, [signOut, retryCount]);
+    return "";
+  };
 
   useEffect(() => {
-    if (!activeOrgId) return;
-
     async function loadSavedLayouts() {
       try {
         setIsLoadingSections(true);
-        const response = await fetch(`/api/sections?ownerOrgId=${activeOrgId}`);
-        if (response.ok) {
-          const data = await response.json();
-          setSectionsList(data.sections || []);
+        const token = getBrowserToken();
+        const result = await getRegistrationSections(token);
+        if (result.success) {
+          setSectionsList(result.sections || []);
         }
       } catch (err) {
-        console.error("Failed to sync structural form builder layouts:", err);
+        console.error(err);
       } finally {
         setIsLoadingSections(false);
       }
     }
     loadSavedLayouts();
-  }, [activeOrgId]);
+  }, []);
 
   const handleOpenCreateModal = () => {
     setEditingSection(null);
@@ -80,7 +56,6 @@ export default function FormsDashboardPage() {
 
   const handleOpenEditModal = (section: any) => {
     const formattedFields = section.fields.map((f: any) => ({
-      id: f.id,
       label: f.label,
       type: f.type,
       required: f.required || false,
@@ -94,82 +69,94 @@ export default function FormsDashboardPage() {
   };
 
   const handleToggleActive = async (section: any) => {
-    if (!activeOrgId) return;
+    const originalStatus = section.isActive;
+    const toggledStatus = !originalStatus;
+
+    // Optimistically update the UI to make the interaction instant
+    setSectionsList((prev) =>
+      prev.map((s) => (s._id === section._id ? { ...s, isActive: toggledStatus } : s))
+    );
+
     try {
+      const token = getBrowserToken();
       const updatedPayload = {
-        ...section,
-        ownerOrgId: activeOrgId,
-        isActive: !section.isActive
+        _id: section._id,
+        title: section.title,
+        isActive: toggledStatus,
+        fields: section.fields,
       };
       
-      const result = await saveRegistrationSection(updatedPayload);
-      if (result.success) {
+      const result = await saveRegistrationSection(token, updatedPayload);
+      if (!result.success) {
+        // Rollback state if server action fails
         setSectionsList((prev) =>
-          prev.map((s) => (s.id === section.id ? result.section : s))
+          prev.map((s) => (s._id === section._id ? { ...s, isActive: originalStatus } : s))
         );
       }
     } catch (err) {
-      console.error("Failed to mutate section visibility status:", err);
+      console.error(err);
+      // Rollback state on error
+      setSectionsList((prev) =>
+        prev.map((s) => (s._id === section._id ? { ...s, isActive: originalStatus } : s))
+      );
     }
   };
 
   const handleDeleteSection = async (id: string) => {
-    if (!activeOrgId) return;
     try {
-      const response = await fetch(`/api/sections/${id}?ownerOrgId=${activeOrgId}`, {
-        method: "DELETE"
-      });
-      if (response.ok) {
-        setSectionsList((prev) => prev.filter((s) => s.id !== id));
+      const token = getBrowserToken();
+      const result = await deleteRegistrationSection(token, id);
+      if (result.success) {
+        setSectionsList((prev) => prev.filter((s) => s._id !== id));
       }
     } catch (err) {
-      console.error("Failed to execute collection deletion request:", err);
+      console.error(err);
     }
   };
 
   const handleSaveSectionData = async (compiledSection: any) => {
-    if (!activeOrgId) return;
     try {
-      const completePayload = {
-        ...compiledSection,
-        ownerOrgId: activeOrgId, 
+      const token = getBrowserToken();
+      const payload = {
+        _id: compiledSection._id,
+        title: compiledSection.title,
+        fields: compiledSection.fields
       };
 
-      const result = await saveRegistrationSection(completePayload);
-
-      if (!result.success) {
-        console.error("Database save transaction rejected:", result.error);
-        return;
-      }
+      const result = await saveRegistrationSection(token, payload);
+      if (!result.success) return;
 
       setSectionsList((prev) => {
-        const exists = prev.some((s) => s.id === compiledSection.id);
+        const exists = prev.some((s) => s._id === compiledSection._id);
         if (exists) {
-          return prev.map((s) => (s.id === compiledSection.id ? result.section : s));
+          return prev.map((s) => (s._id === compiledSection._id ? result.section : s));
         } else {
           return [result.section, ...prev];
         }
       });
-
+      setModalOpen(false);
+      setEditingSection(null);
     } catch (err) {
-      console.error("Failed to run native database save layout pipeline:", err);
+      console.error(err);
     }
   };
 
-  if (isVerifying) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen gap-2 bg-background text-foreground">
-        <Loader2 className="h-7 w-7 animate-spin text-primary" />
-        <p className="text-xs font-medium text-muted-foreground">Verifying secure workspace parameters...</p>
-      </div>
-    );
-  }
+  const getFieldIcon = (type: string) => {
+    switch (type) {
+      case "number": return <Hash className="h-3.5 w-3.5" />;
+      case "textarea": return <AlignLeft className="h-3.5 w-3.5" />;
+      case "select": return <ChevronDown className="h-3.5 w-3.5" />;
+      default: return <Type className="h-3.5 w-3.5" />;
+    }
+  };
+
+  const filteredSections = sectionsList.filter((section) =>
+    section.title?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto p-4 md:p-6 min-h-screen antialiased text-foreground">
-      
-      {/* Header Controls */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b pb-5">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="space-y-1">
           <h1 className="text-2xl font-bold tracking-tight">Registration Sections</h1>
           <p className="text-sm text-muted-foreground">
@@ -183,101 +170,146 @@ export default function FormsDashboardPage() {
             editingSection={editingSection}
             onSaveSection={handleSaveSectionData}
             triggerButton={
-              <button 
-                onClick={handleOpenCreateModal}
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 h-10 text-sm font-semibold text-primary-foreground shadow-xs hover:opacity-90 transition-opacity"
-              >
+              <Button onClick={handleOpenCreateModal} className="w-full sm:w-auto">
                 Create New Section
-              </button>
+              </Button>
             }
           />
         </div>
       </div>
 
-      {/* Stacked Row Layout Wrapper */}
-      <div className="space-y-3">
-        {isLoadingSections ? (
-          <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-2">
-            <Loader2 className="h-7 w-7 animate-spin text-primary" />
-            <p className="text-xs font-medium">Loading schema layouts securely from database...</p>
-          </div>
-        ) : sectionsList.length === 0 ? (
-          <div className="border-2 border-dashed rounded-xl p-12 text-center text-muted-foreground bg-card">
-            <FileSpreadsheet className="h-10 w-10 mx-auto opacity-40 mb-3 text-primary" />
-            <p className="font-semibold text-sm">No custom dynamic sections created yet.</p>
-            <p className="text-xs max-w-xs mx-auto mt-1">Click the button above to begin structural field configurations.</p>
-          </div>
-        ) : (
-          sectionsList.map((section) => (
-            <div 
-              key={section.id}
-              className="border bg-card rounded-lg p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 hover:border-primary/20 transition-all shadow-3xs"
-            >
-              <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6 w-full sm:w-auto">
-                <div className="space-y-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="font-bold text-sm text-foreground tracking-tight">
-                      {section.title}
-                    </h3>
-                    {section.isActive ? (
-                      <span className="inline-flex items-center gap-0.5 text-[9px] font-bold uppercase text-emerald-600 bg-emerald-50 dark:bg-emerald-950/20 px-1.5 py-0.5 rounded-sm border border-emerald-200/40">
-                        <CheckCircle2 className="h-2.5 w-2.5" /> Live
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-0.5 text-[9px] font-bold uppercase text-muted-foreground bg-muted px-1.5 py-0.5 rounded-sm border">
-                        <XCircle className="h-2.5 w-2.5" /> Off
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
-                    <span className="font-mono opacity-60 tracking-wider text-[10px]">{section.id.toUpperCase()}</span>
-                    <span className="hidden sm:inline text-muted-foreground/40">•</span>
-                    <span className="flex items-center gap-1">
-                      <Calendar className="h-3 w-3" /> 
-                      {section.createdAt ? new Date(section.createdAt).toLocaleDateString() : new Date().toLocaleDateString()}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="inline-flex items-center gap-1 bg-muted/40 px-2 py-0.5 rounded-md border text-[11px] font-medium text-muted-foreground max-w-fit shrink-0">
-                  <ListPlus className="h-3.5 w-3.5 text-primary" /> {section.fields?.length || 0} Inputs
-                </div>
-              </div>
-
-              <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto">
-                <button
-                  onClick={() => handleOpenEditModal(section)}
-                  className="h-9 sm:h-8 px-3 rounded-md border text-xs font-semibold flex items-center justify-center gap-1.5 hover:bg-muted bg-background transition-colors text-foreground w-full sm:w-auto"
-                >
-                  <Edit2 className="h-3 w-3 text-primary shrink-0" />
-                  <span>Edit Layout</span>
-                </button>
-
-                <button
-                  onClick={() => handleToggleActive(section)}
-                  className={`h-9 sm:h-8 px-3 rounded-md border text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors w-full sm:w-auto ${
-                    section.isActive 
-                      ? "hover:bg-amber-50 text-amber-600 hover:text-amber-700 bg-background" 
-                      : "hover:bg-emerald-50 text-emerald-600 hover:text-emerald-700 bg-background"
-                  }`}
-                >
-                  <Power className="h-3 w-3 shrink-0" />
-                  <span>{section.isActive ? "Deactivate" : "Activate"}</span>
-                </button>
-
-                <button
-                  onClick={() => handleDeleteSection(section._id || section.id)}
-                  className="h-9 sm:h-8 px-3 rounded-md border text-xs font-semibold flex items-center justify-center gap-1.5 hover:bg-destructive/10 text-destructive bg-background transition-colors w-full sm:w-auto"
-                >
-                  <Trash2 className="h-3 w-3 shrink-0" />
-                  <span>Delete</span>
-                </button>
-              </div>
-            </div>
-          ))
-        )}
+      <div className="relative max-w-sm">
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          placeholder="Search sections..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-9 h-10 shadow-3xs"
+        />
       </div>
 
+      <Separator />
+
+      {isLoadingSections ? (
+        <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-2">
+          <Loader2 className="h-7 w-7 animate-spin text-primary" />
+          <p className="text-xs font-medium">Loading schema layouts securely from database...</p>
+        </div>
+      ) : filteredSections.length === 0 ? (
+        <Card className="border-dashed shadow-none">
+          <CardContent className="flex flex-col items-center justify-center p-12 text-center text-muted-foreground">
+            <FileSpreadsheet className="h-10 w-10 mx-auto opacity-40 mb-3 text-primary" />
+            <p className="font-semibold text-sm">No layout structures found.</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          {filteredSections.map((section) => (
+            <Card key={section._id} className="shadow-xs rounded-2xl border border-muted/60 flex flex-col justify-between bg-background">
+              <CardContent className="p-5 space-y-5 relative">
+                
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-3">
+                    <Avatar className="rounded-xl h-12 w-12 shrink-0 bg-[#E2DFCD] border-none">
+                      <AvatarFallback className="rounded-xl bg-transparent text-[#606050]">
+                        <LayoutGrid className="h-5 w-5" />
+                      </AvatarFallback>
+                    </Avatar>
+                    
+                    <div className="space-y-0.5">
+                      <h3 className="text-base font-medium text-[#333333] tracking-tight line-clamp-1">
+                        {section.title}
+                      </h3>
+                      <div className="flex items-center gap-1 text-[13px] text-muted-foreground/80">
+                        <Calendar className="h-3.5 w-3.5 shrink-0 text-muted-foreground" /> 
+                        <span>{section.createdAt ? new Date(section.createdAt).toLocaleDateString("en-GB") : new Date().toLocaleDateString("en-GB")}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Clean Shadcn Toggle component implementation replacing old switch components */}
+                  <div className="flex items-center shrink-0">
+                    <Toggle
+                      pressed={section.isActive}
+                      onPressedChange={() => handleToggleActive(section)}
+                      size="sm"
+                      aria-label="Toggle section activation state"
+                      className="h-8 px-2.5 rounded-lg border border-muted data-[state=on]:bg-emerald-50 data-[state=on]:text-emerald-700 data-[state=on]:border-emerald-200/60"
+                    >
+                      {section.isActive ? (
+                        <Eye className="h-4 w-4" />
+                      ) : (
+                        <EyeOff className="h-4 w-4 text-muted-foreground/80" />
+                      )}
+                    </Toggle>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                    Surface Fields ({section.fields?.length || 0})
+                  </p>
+                  <div className="flex flex-wrap gap-1.5 max-h-[80px] overflow-y-auto pr-1">
+                    {section.fields && section.fields.length > 0 ? (
+                      section.fields.map((field: any, idx: number) => (
+                        <TooltipProvider key={idx}>
+                          <Tooltip delayDuration={200}>
+                            <TooltipTrigger asChild>
+                              <Badge 
+                                variant="default" 
+                                className="bg-[#5D87E6] hover:bg-[#5D87E6] text-white font-normal text-[12px] px-3 py-1.5 rounded-lg gap-1.5 max-w-[150px] truncate border-none shadow-3xs"
+                              >
+                                {getFieldIcon(field.type)}
+                                <span className="truncate">{field.label}</span>
+                                {field.required && <span className="text-red-300 font-bold text-[11px] leading-none ml-0.5">*</span>}
+                              </Badge>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p className="text-xs font-medium">{field.label} ({field.type})</p>
+                              {field.placeholder && <p className="text-[10px] text-muted-foreground">Hint: {field.placeholder}</p>}
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      ))
+                    ) : (
+                      <span className="text-xs text-muted-foreground italic">No fields configured</span>
+                    )}
+                  </div>
+                </div>
+
+                <Separator />
+
+                <div className="flex items-center justify-between pt-2">
+                  <div className="text-sm font-medium text-muted-foreground flex items-center gap-1">
+                    Status: <span className={section.isActive ? "text-emerald-600 font-semibold" : "text-muted-foreground font-medium"}>{section.isActive ? "Live" : "Off"}</span>
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => handleOpenEditModal(section)}
+                      className="h-9 w-9 rounded-xl border border-muted/70 text-muted-foreground hover:text-foreground shadow-3xs bg-background"
+                    >
+                      <Edit2 className="h-4 w-4" />
+                    </Button>
+
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => handleDeleteSection(section._id)}
+                      className="h-9 w-9 rounded-xl border border-muted/70 text-muted-foreground hover:bg-destructive/10 hover:text-destructive shadow-3xs bg-background"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -1,54 +1,55 @@
-// src/lib/actions/auth.actions.ts
 "use server";
 
 import { auth } from "@clerk/nextjs/server";
 import { connectToDB } from "@/database/db";
 import { User } from "@/database/models/user.model";
 import { Organization } from "@/database/models/organization.model";
-import { getNativeSessionData, createInternalJWTSession } from "@/lib/auth-token";
+import { SignJWT, jwtVerify } from "jose";
 
-export async function verifyAndFetchWorkspace() {
+const JWT_SECRET = new TextEncoder().encode(
+  process.env.INTERNAL_JWT_SECRET || "super_secure_minimum_32_character_secret_key"
+);
+
+// Generates the raw JWT string instantly on the server side
+export async function getNativeJWTString() {
   try {
-    // 1. Try reading your existing native internal JWT cookie first
-    let session = await getNativeSessionData();
-
-    // 2. If it exists, return it immediately (Happy Path)
-    if (session) {
-      return { success: true, userId: session.userId, ownerOrgId: session.ownerOrgId };
-    }
-
-    // 3. FALLBACK: If cookie is missing (e.g. fresh login), check the active Clerk Token synchronously
     const { userId: clerkId, orgId: clerkOrgId } = await auth();
-
-    // If both your internal session AND Clerk are empty, they are truly logged out
-    if (!clerkId || !clerkOrgId) {
-      return { success: false, authError: true, error: "No active session found." };
-    }
+    if (!clerkId || !clerkOrgId) return { success: false, token: null };
 
     await connectToDB();
 
-    // 4. Resolve internal MongoDB ObjectIds using the live Clerk context tokens
     const [dbUser, dbOrg] = await Promise.all([
       User.findOne({ clerkId }),
       Organization.findOne({ clerkOrgId })
     ]);
 
-    // If webhook hasn't processed the database syncing yet, wait or block gracefully
-    if (!dbUser || !dbOrg) {
-      return { success: false, authError: false, retry: true, error: "Syncing workspace, please wait..." };
-    }
+    if (!dbUser || !dbOrg) return { success: false, token: null };
 
-    // 5. Generate and drop the missing JWT cookie synchronously on the server right now!
-    const payload = {
+    const token = await new SignJWT({
       userId: dbUser._id.toString(),
       ownerOrgId: dbOrg._id.toString()
-    };
-    
-    await createInternalJWTSession(payload);
+    })
+      .setProtectedHeader({ alg: "HS256" })
+      .setIssuedAt()
+      .setExpirationTime("7d")
+      .sign(JWT_SECRET);
 
-    return { success: true, userId: payload.userId, ownerOrgId: payload.ownerOrgId };
+    return { success: true, token };
   } catch (error) {
-    console.error("Critical native session initialization failure:", error);
-    return { success: false, authError: true, error: "Authentication system error encountered." };
+    console.error("JWT generation crash:", error);
+    return { success: false, token: null };
+  }
+}
+
+//Used inside your database actions to read the passed JWT string
+export async function verifyJWTString(token: string) {
+  try {
+    const { payload } = await jwtVerify(token, JWT_SECRET);
+    return {
+      userId: payload.userId as string,
+      ownerOrgId: payload.ownerOrgId as string
+    };
+  } catch (err) {
+    return null;
   }
 }

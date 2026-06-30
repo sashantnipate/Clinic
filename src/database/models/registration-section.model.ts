@@ -1,7 +1,6 @@
 import { Schema, model, models, Types } from "mongoose";
 
 export interface IRegistrationField {
-  id: string;
   label: string;
   type: "text" | "number" | "textarea" | "select";
   required: boolean;
@@ -11,7 +10,7 @@ export interface IRegistrationField {
 }
 
 export interface IRegistrationSection {
-  _id: string;
+  _id: Types.ObjectId; 
   ownerOrgId: Types.ObjectId; 
   title: string;
   fields: IRegistrationField[];
@@ -21,7 +20,6 @@ export interface IRegistrationSection {
 }
 
 const RegistrationFieldSchema = new Schema<IRegistrationField>({
-  id: { type: String, required: true },
   label: { type: String, required: true },
   type: {
     type: String,
@@ -56,7 +54,6 @@ const RegistrationSectionSchema = new Schema<IRegistrationSection>(
   { timestamps: true }
 );
 
-// High-performance compound index rewritten for ownerOrgId queries
 RegistrationSectionSchema.index({ ownerOrgId: 1, isActive: 1, createdAt: -1 });
 
 export const RegistrationSection =
