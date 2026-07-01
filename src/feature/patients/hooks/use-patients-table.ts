@@ -1,4 +1,5 @@
-// src/feature/patients/hooks/use-patients-table.ts
+"use client";
+
 import { useState, useMemo } from "react";
 import { Patient, VisibleColumns } from "../types";
 
@@ -89,7 +90,7 @@ export function usePatientsTable(initialPatients: Patient[], itemsPerPage = 10) 
   const isSomeSelected = selectedVisibleCount > 0 && selectedVisibleCount < currentFilteredIds.length;
 
   const handleToggleRow = (id: string, checked: boolean) => {
-    setSelectedIds((prev) => checked ? [...prev, id] : prev.filter((rowId) => rowId !== id));
+    setSelectedIds((prev) => (checked ? [...prev, id] : prev.filter((rowId) => rowId !== id)));
   };
 
   const handleToggleAll = (checked: boolean) => {
@@ -101,10 +102,9 @@ export function usePatientsTable(initialPatients: Patient[], itemsPerPage = 10) 
   };
 
   return {
-    // State
     globalSearch, setGlobalSearch,
     sortOrder, setSortOrder,
-    currentPage, setCurrentPage, totalPages,
+    currentPage: activePage, setCurrentPage, totalPages,
     nameFilter, setNameFilter,
     genderFilter, setGenderFilter,
     ageCondition, setAgeCondition,
@@ -112,10 +112,8 @@ export function usePatientsTable(initialPatients: Patient[], itemsPerPage = 10) 
     contactFilter, setContactFilter,
     regDateFilter, setRegDateFilter,
     visibleColumns, setVisibleColumns,
-    selectedIds, isAllSelected, isSomeSelected, selectedVisibleCount,
-    // Data
+    selectedIds, setSelectedIds, isAllSelected, isSomeSelected, selectedVisibleCount,
     processedPatients, paginatedPatients,
-    // Actions
-    handleToggleRow, handleToggleAll, parseAge
+    handleToggleRow, handleToggleAll, parseAge,
   };
 }

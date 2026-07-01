@@ -26,10 +26,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { getRegistrationSections } from "@/lib/actions/section.actions";
-import { createPatientRecord } from "@/lib/actions/patient.actions";
+import { createPatientRecord, updatePatientRecord } from "@/lib/actions/patient.actions";
 
 interface PatientFormModalProps {
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  patientToEdit?: any;
   onAddPatient?: (patient: any) => void;
+  onUpdatePatient?: (patient: any) => void;
 }
 
 interface CustomField {
@@ -46,12 +50,22 @@ interface CustomSection {
   fields: CustomField[];
 }
 
-export function PatientFormModal({ onAddPatient }: PatientFormModalProps) {
-  const [open, setOpen] = useState(false);
+export function PatientFormModal({ 
+  open: externalOpen, 
+  onOpenChange, 
+  patientToEdit, 
+  onAddPatient,
+  onUpdatePatient 
+}: PatientFormModalProps) {
+  // Support both internal standalone trigger state and external table action trigger state
+  const [internalOpen, setInternalOpen] = useState(false);
+  const isControlled = externalOpen !== undefined;
+  const open = isControlled ? externalOpen : internalOpen;
+  const setOpen = isControlled && onOpenChange ? onOpenChange : setInternalOpen;
+
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   
-  // Database Templates
   const [availableSections, setAvailableSections] = useState<any[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
 
@@ -75,6 +89,39 @@ export function PatientFormModal({ onAddPatient }: PatientFormModalProps) {
     return "";
   };
 
+  // Pre-populate fields automatically if modifying an existing clinical record
+  useEffect(() => {
+    if (open) {
+      if (patientToEdit) {
+        setFormData({
+          name: patientToEdit.name || "",
+          email: patientToEdit.email || "",
+          phone: patientToEdit.phone || "",
+          address: patientToEdit.address || "",
+        });
+        setGender((patientToEdit.gender?.toLowerCase() as any) || "male");
+        
+        // Parse date safely whether it comes as Date string or ISO candidate
+        if (patientToEdit.dob) {
+          const parsedDate = new Date(patientToEdit.dob);
+          setDate(isNaN(parsedDate.getTime()) ? undefined : parsedDate);
+        } else {
+          setDate(undefined);
+        }
+
+        setCustomSections(patientToEdit.customSections || []);
+        setCustomData(patientToEdit.customData || {});
+      } else {
+        // Clear old fields completely if opening a fresh blank addition form
+        setFormData({ name: "", email: "", phone: "", address: "" });
+        setGender("male");
+        setDate(undefined);
+        setCustomSections([]);
+        setCustomData({});
+      }
+    }
+  }, [patientToEdit, open]);
+
   useEffect(() => {
     async function loadTemplates() {
       if (!open) return;
@@ -82,7 +129,6 @@ export function PatientFormModal({ onAddPatient }: PatientFormModalProps) {
         const token = getBrowserToken();
         const result = await getRegistrationSections(token);
         if (result.success) {
-          // Only show active templates
           setAvailableSections(result.sections.filter((s: any) => s.isActive) || []);
         }
       } catch (err) {
@@ -116,13 +162,12 @@ export function PatientFormModal({ onAddPatient }: PatientFormModalProps) {
     };
 
     setCustomSections((prev) => [...prev, newSection]);
-    setSelectedTemplateId(""); // Reset selection
+    setSelectedTemplateId("");
   };
 
   const handleRemoveSection = (sectionId: string) => {
     setCustomSections((prev) => prev.filter((sec) => sec.id !== sectionId));
     
-    // Clean up customData associated with the removed section
     const sectionToRemove = customSections.find(s => s.id === sectionId);
     if (sectionToRemove) {
       setCustomData(prev => {
@@ -152,7 +197,7 @@ export function PatientFormModal({ onAddPatient }: PatientFormModalProps) {
       email: formData.email,
       phone: formData.phone,
       address: formData.address || undefined,
-      dob: date,
+      dob: date.toISOString(),
       gender,
       customSections,
       customData,
@@ -160,29 +205,45 @@ export function PatientFormModal({ onAddPatient }: PatientFormModalProps) {
 
     try {
       const token = getBrowserToken();
-      const result = await createPatientRecord(token, payload);
-
-      if (result.success && onAddPatient) {
-        // Map DB record to local table state format to update UI instantly
-        onAddPatient({
-          id: result.patient._id,
-          name: result.patient.name,
-          email: result.patient.email,
-          phone: result.patient.phone,
-          dob: new Date(result.patient.dob).toISOString(),
-          gender: result.patient.gender,
-          createdAt: new Date(result.patient.createdAt).toLocaleDateString(),
-        });
-        
-        // Reset state
-        setFormData({ name: "", email: "", phone: "", address: "" });
-        setCustomSections([]);
-        setCustomData({});
-        setDate(undefined);
-        setGender("male");
-        setOpen(false);
+      
+      if (patientToEdit) {
+        // EXECUTE PROFILE EDIT UPDATE
+        const result = await updatePatientRecord(token, patientToEdit.id, payload);
+        if (result.success && onUpdatePatient) {
+          onUpdatePatient({
+            id: patientToEdit.id,
+            name: result.patient.name,
+            email: result.patient.email,
+            phone: result.patient.phone,
+            dob: result.patient.dob,
+            gender: result.patient.gender,
+            createdAt: patientToEdit.createdAt, // Retain display registration date
+            customSections: result.patient.customSections,
+            customData: result.patient.customData
+          });
+          setOpen(false);
+        } else {
+          alert(result.error || "Failed to update profile data.");
+        }
       } else {
-        alert(result.error || "Failed to save patient.");
+        // EXECUTE FRESH INTAKE CREATION
+        const result = await createPatientRecord(token, payload);
+        if (result.success && onAddPatient) {
+          onAddPatient({
+            id: result.patient._id,
+            name: result.patient.name,
+            email: result.patient.email,
+            phone: result.patient.phone,
+            dob: result.patient.dob,
+            gender: result.patient.gender,
+            createdAt: new Date(result.patient.createdAt).toLocaleDateString("en-GB"),
+            customSections: result.patient.customSections,
+            customData: result.patient.customData
+          });
+          setOpen(false);
+        } else {
+          alert(result.error || "Failed to save patient.");
+        }
       }
     } catch (err) {
       console.error(err);
@@ -192,23 +253,27 @@ export function PatientFormModal({ onAddPatient }: PatientFormModalProps) {
     }
   };
 
-  // Determine unadded sections for the dropdown
   const unaddedSections = availableSections.filter(
     (s) => !customSections.some((cs) => cs.id === s._id)
   );
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button className="gap-2">
-          <Plus className="h-4 w-4" />
-          New Patient
-        </Button>
-      </DialogTrigger>
+      {/* Dynamic Condition: Only show primary trigger button if it's not being controlled externally */}
+      {!isControlled && (
+        <DialogTrigger asChild>
+          <Button className="gap-2">
+            <Plus className="h-4 w-4" />
+            New Patient
+          </Button>
+        </DialogTrigger>
+      )}
       
       <DialogContent className="w-[90vw] md:max-w-3xl lg:max-w-4xl max-h-[90vh] overflow-y-auto p-6 md:p-8 will-change-transform antialiased">
         <DialogHeader className="mb-4">
-          <DialogTitle className="text-xl md:text-2xl">Register New Patient</DialogTitle>
+          <DialogTitle className="text-xl md:text-2xl">
+            {patientToEdit ? `Modify Profile: ${patientToEdit.name}` : "Register New Patient"}
+          </DialogTitle>
           <DialogDescription>
             Enter the patient's personal records and mandatory demographic information below.
           </DialogDescription>
@@ -268,14 +333,14 @@ export function PatientFormModal({ onAddPatient }: PatientFormModalProps) {
                       )}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4 shrink-0 text-muted-foreground" />
-                      {date ? date.toLocaleDateString() : "Select date"}
+                      {date ? date.toLocaleDateString("en-GB") : "Select date"}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto overflow-hidden p-0 z-50" align="start">
                     <Calendar
                       mode="single"
                       selected={date}
-                      defaultMonth={date}
+                      defaultMonth={date || new Date(2000, 0, 1)}
                       captionLayout="dropdown"
                       onSelect={(selectedDate) => {
                         setDate(selectedDate);
@@ -315,7 +380,7 @@ export function PatientFormModal({ onAddPatient }: PatientFormModalProps) {
             </div>
           </div>
 
-          {/* Rendered Template Sections */}
+          {/* Custom Template Sections Layout Renderer */}
           {customSections.map((section) => (
             <div key={section.id} className="space-y-4 pt-2">
               <div className="flex items-center justify-between border-b pb-2">
@@ -382,33 +447,36 @@ export function PatientFormModal({ onAddPatient }: PatientFormModalProps) {
             </div>
           ))}
 
-          {/* Template Selector Tool */}
-          <div className="pt-4 flex flex-col sm:flex-row items-start sm:items-center gap-3 border-t border-dashed">
-            <Select 
-              value={selectedTemplateId} 
-              onValueChange={setSelectedTemplateId}
-            >
-              <SelectTrigger className="w-full sm:w-[300px] mt-4 h-10">
-                <SelectValue placeholder="Select a section template to add..." />
-              </SelectTrigger>
-              <SelectContent>
-                {unaddedSections.length === 0 ? (
-                  <SelectItem value="none" disabled>
-                    {availableSections.length === 0 ? "No templates found" : "All templates added"}
-                  </SelectItem>
-                ) : (
-                  unaddedSections.map((s) => (
-                    <SelectItem key={s._id} value={s._id}>
-                      {s.title}
+          {/* Template Dynamic Selector Tool */}
+          <div className="pt-4 flex flex-col sm:flex-row items-end gap-3 border-t border-dashed">
+            <div className="w-full sm:w-[300px] grid gap-1.5">
+              <Label>Additional Assessment Structural Modules</Label>
+              <Select 
+                value={selectedTemplateId} 
+                onValueChange={setSelectedTemplateId}
+              >
+                <SelectTrigger className="h-10">
+                  <SelectValue placeholder="Select custom blueprint module..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {unaddedSections.length === 0 ? (
+                    <SelectItem value="none" disabled>
+                      {availableSections.length === 0 ? "No active schema template records found" : "All template profiles appended"}
                     </SelectItem>
-                  ))
-                )}
-              </SelectContent>
-            </Select>
+                  ) : (
+                    unaddedSections.map((s) => (
+                      <SelectItem key={s._id} value={s._id}>
+                        {s.title}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
             <Button
               type="button"
               variant="secondary"
-              className="w-full sm:w-auto mt-0 sm:mt-4 h-10"
+              className="w-full sm:w-auto h-10 shrink-0"
               onClick={handleAddSectionFromTemplate}
               disabled={!selectedTemplateId || selectedTemplateId === "none"}
             >
@@ -433,10 +501,10 @@ export function PatientFormModal({ onAddPatient }: PatientFormModalProps) {
             >
               {isSaving ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Persisting Record...
                 </>
               ) : (
-                "Save Patient"
+                patientToEdit ? "Save Changes" : "Save Patient"
               )}
             </Button>
           </DialogFooter>

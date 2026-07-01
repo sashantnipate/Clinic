@@ -1,73 +1,21 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
-import { 
-  ChevronDown, 
-  MoreHorizontal, 
-  ArrowUpDown, 
-  Filter, 
-  Eye, 
-  Edit, 
-  Trash2, 
-  X, 
-  Plus, 
-  Phone, 
-  Mail, 
-  Calendar as CalendarIcon,
-  Loader2 
-} from "lucide-react";
+import React from "react";
+import { Phone, Mail, Calendar as CalendarIcon, Filter } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
 
-// Import shadcn Dialog components for custom modals
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Popover as ShadcnPopover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { Input as ShadcnInput } from "@/components/ui/input";
+import { Label as ShadcnLabel } from "@/components/ui/label";
+import { Button as ShadcnButton } from "@/components/ui/button";
 
-import { deletePatientRecord } from "@/lib/actions/patient.actions";
-import { PatientFormModal } from "./patient-form";
-
-export interface Patient {
-  id: string;
-  name: string;
-  email: string;
-  phone: string;
-  dob: string;
-  gender: string;
-  createdAt: string;
-  customSections?: any;
-  customData?: any;
-}
+import { usePatientsTable } from "./hooks/use-patients-table";
+import { TableFilters, NameHeaderFilter, MetricsHeaderFilter } from "./components/table-filters";
+import { RowActions } from "./components/row-actions";
+import { TablePagination } from "./components/table-pagination";
+import { Patient } from "./types";
 
 interface PatientsTableProps {
   patients: Patient[];
@@ -76,199 +24,46 @@ interface PatientsTableProps {
 }
 
 export function PatientsTable({ patients, onUpdatePatient, onDeletePatient }: PatientsTableProps) {
-  // Global View, Modals, & Sorting States
-  const [globalSearch, setGlobalSearch] = useState("");
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc" | null>(null);
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
-  
-  // Custom Shadcn Modal States
-  const [patientToDelete, setPatientToDelete] = useState<Patient | null>(null);
-  const [patientToEdit, setPatientToEdit] = useState<Patient | null>(null);
-  
-  // Pagination Configuration
-  const [currentPage, setCurrentPage] = useState(1);
-  const ITEMS_PER_PAGE = 10;
-
-  // Specific Column Filters State
-  const [nameFilter, setNameFilter] = useState("");
-  const [genderFilter, setGenderFilter] = useState("all");
-  const [ageCondition, setAgeCondition] = useState<"gt" | "lt" | "eq" | "none">("none");
-  const [ageValue, setAgeValue] = useState("");
-  const [contactFilter, setContactFilter] = useState("");
-  const [regDateFilter, setRegDateFilter] = useState("");
-
-  // Column Visibility States
-  const [visibleColumns, setVisibleColumns] = useState({
-    genderAge: true,
-    contactInfo: true,
-    regDate: true,
-  });
-
-  // Confirmed Server Actions Execution Lifecycle
-  const handleConfirmedDelete = async () => {
-    if (!patientToDelete) return;
-    const targetId = patientToDelete.id;
-
-    try {
-      setDeletingId(targetId);
-      const token = localStorage.getItem("clinic_jwt") || "";
-      const result = await deletePatientRecord(token, targetId);
-
-      if (result.success) {
-        onDeletePatient(targetId);
-        setSelectedIds((prev) => prev.filter((id) => id !== targetId));
-      }
-    } catch (error) {
-      console.error("Deletion process error: ", error);
-    } finally {
-      setDeletingId(null);
-      setPatientToDelete(null);
-    }
-  };
-
-  const parseAge = (dobString: string) => {
-    if (!dobString) return null;
-    let birthYear = new Date(dobString).getFullYear();
-    
-    if (isNaN(birthYear) && dobString.includes("/")) {
-      const segments = dobString.split("/");
-      const yearCandidate = parseInt(segments[segments.length - 1], 10);
-      if (yearCandidate) birthYear = yearCandidate;
-    }
-    if (isNaN(birthYear)) return null;
-    return new Date().getFullYear() - birthYear;
-  };
-
-  const processedPatients = useMemo(() => {
-    let result = patients.filter((p) => {
-      if (!p) return false;
-
-      const name = p.name?.toLowerCase() || "";
-      const email = p.email?.toLowerCase() || "";
-      const phone = p.phone || "";
-      const createdAt = p.createdAt || "";
-      const query = globalSearch.toLowerCase();
-
-      const matchesGlobal = name.includes(query) || email.includes(query) || phone.includes(query);
-      const matchesNameColumn = name.includes(nameFilter.toLowerCase());
-      const matchesGenderColumn = genderFilter === "all" || (p.gender?.toLowerCase() || "") === genderFilter;
-      const matchesContactColumn = email.includes(contactFilter.toLowerCase()) || phone.includes(contactFilter);
-      const matchesRegDateColumn = createdAt.includes(regDateFilter);
-
-      let matchesAgeCondition = true;
-      if (ageCondition !== "none" && ageValue) {
-        const patientAge = parseAge(p.dob);
-        const targetAge = parseInt(ageValue, 10);
-        
-        if (patientAge !== null && !isNaN(targetAge)) {
-          if (ageCondition === "gt") matchesAgeCondition = patientAge > targetAge;
-          if (ageCondition === "lt") matchesAgeCondition = patientAge < targetAge;
-          if (ageCondition === "eq") matchesAgeCondition = patientAge === targetAge;
-        } else {
-          matchesAgeCondition = false;
-        }
-      }
-
-      return matchesGlobal && matchesNameColumn && matchesGenderColumn && matchesAgeCondition && matchesContactColumn && matchesRegDateColumn;
-    });
-
-    if (sortOrder) {
-      result.sort((a, b) => {
-        if (sortOrder === "asc") return (a.name || "").localeCompare(b.name || "");
-        return (b.name || "").localeCompare(a.name || "");
-      });
-    }
-
-    return result;
-  }, [patients, globalSearch, sortOrder, nameFilter, genderFilter, ageCondition, ageValue, contactFilter, regDateFilter]);
-
-  const totalPages = Math.max(Math.ceil(processedPatients.length / ITEMS_PER_PAGE), 1);
-  const activePage = currentPage > totalPages ? totalPages : currentPage;
-
-  const paginatedPatients = useMemo(() => {
-    const startIdx = (activePage - 1) * ITEMS_PER_PAGE;
-    return processedPatients.slice(startIdx, startIdx + ITEMS_PER_PAGE);
-  }, [processedPatients, activePage]);
-
-  const currentFilteredIds = processedPatients.map((p) => p.id);
-  const selectedVisibleCount = currentFilteredIds.filter((id) => selectedIds.includes(id)).length;
-
-  const isAllSelected = currentFilteredIds.length > 0 && selectedVisibleCount === currentFilteredIds.length;
-  const isSomeSelected = selectedVisibleCount > 0 && selectedVisibleCount < currentFilteredIds.length;
-
-  const handleToggleRow = (id: string, checked: boolean) => {
-    setSelectedIds((prev) =>
-      checked ? [...prev, id] : prev.filter((rowId) => rowId !== id)
-    );
-  };
-
-  const handleToggleAll = (checked: boolean) => {
-    if (checked) {
-      setSelectedIds((prev) => Array.from(new Set([...prev, ...currentFilteredIds])));
-    } else {
-      setSelectedIds((prev) => prev.filter((id) => !currentFilteredIds.includes(id)));
-    }
-  };
-
-  const ColumnTogglePill = ({ label, isVisible, toggleFn }: { label: string, isVisible: boolean, toggleFn: () => void }) => (
-    <Button
-      variant={isVisible ? "secondary" : "outline"}
-      size="sm"
-      className={cn("h-7 text-xs rounded-full px-3 transition-all", !isVisible && "text-muted-foreground")}
-      onClick={toggleFn}
-    >
-      {label}
-      {isVisible ? <X className="ml-1.5 h-3 w-3 opacity-70" /> : <Plus className="ml-1.5 h-3 w-3 opacity-70" />}
-    </Button>
-  );
+  const t = usePatientsTable(patients);
 
   return (
     <div className="w-full space-y-4">
-      {/* Top Global Action Bar */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <Input
-          placeholder="Filter patients..."
-          value={globalSearch}
-          onChange={(e) => { setGlobalSearch(e.target.value); setCurrentPage(1); }}
-          className="w-full sm:max-w-sm h-9 bg-background"
-        />
-      </div>
+      {/* Search & Global Column Configuration Bar */}
+      <TableFilters
+        globalSearch={t.globalSearch}
+        setGlobalSearch={t.setGlobalSearch}
+        setCurrentPage={t.setCurrentPage}
+        visibleColumns={t.visibleColumns}
+        setVisibleColumns={t.setVisibleColumns}
+        nameFilter={t.nameFilter}
+        setNameFilter={t.setNameFilter}
+        genderFilter={t.genderFilter}
+        setGenderFilter={t.setGenderFilter}
+        ageCondition={t.ageCondition}
+        setAgeCondition={t.setAgeCondition}
+        ageValue={t.ageValue}
+        setAgeValue={t.setAgeValue}
+        contactFilter={t.contactFilter}
+        setContactFilter={t.setContactFilter}
+        regDateFilter={t.regDateFilter}
+        setRegDateFilter={t.setRegDateFilter}
+        setSortOrder={t.setSortOrder}
+      />
 
-      {/* Interactive Column Visibility Pills */}
-      <div className="hidden sm:flex flex-wrap items-center gap-2 pb-2">
-        <span className="text-xs font-medium text-muted-foreground mr-1 uppercase tracking-wider">Visible Columns:</span>
-        <ColumnTogglePill 
-          label="Gender / Age" 
-          isVisible={visibleColumns.genderAge} 
-          toggleFn={() => setVisibleColumns(p => ({ ...p, genderAge: !p.genderAge }))} 
-        />
-        <ColumnTogglePill 
-          label="Contact Info" 
-          isVisible={visibleColumns.contactInfo} 
-          toggleFn={() => setVisibleColumns(p => ({ ...p, contactInfo: !p.contactInfo }))} 
-        />
-        <ColumnTogglePill 
-          label="Registration Date" 
-          isVisible={visibleColumns.regDate} 
-          toggleFn={() => setVisibleColumns(p => ({ ...p, regDate: !p.regDate }))} 
-        />
-      </div>
-
-      {/* 📱 Mobile and Tablet Layout Mode View */}
+      {/* 📱 Mobile Responsive Cards Display Grid */}
       <div className="grid grid-cols-1 gap-3 md:hidden">
-        {paginatedPatients.length === 0 ? (
+        {t.paginatedPatients.length === 0 ? (
           <div className="rounded-md border p-8 text-center text-muted-foreground text-sm bg-card">
-            No matching patients found within specified metrics.
+            No matching patient records found.
           </div>
         ) : (
-          paginatedPatients.map((patient) => {
-            const age = parseAge(patient.dob);
-            const isSelected = selectedIds.includes(patient.id);
+          t.paginatedPatients.map((patient) => {
+            const age = t.parseAge(patient.dob);
+            const isSelected = t.selectedIds.includes(patient.id);
 
             return (
-              <div 
-                key={patient.id} 
+              <div
+                key={patient.id}
                 className={cn(
                   "rounded-lg border p-4 bg-card space-y-3 shadow-xs transition-colors relative",
                   isSelected && "border-primary bg-primary/5"
@@ -276,11 +71,10 @@ export function PatientsTable({ patients, onUpdatePatient, onDeletePatient }: Pa
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-3">
-                    <Checkbox 
-                      checked={isSelected} 
-                      onCheckedChange={(v) => handleToggleRow(patient.id, !!v)} 
-                      aria-label="Select row" 
-                      className="mt-0.5"
+                    <Checkbox
+                      checked={isSelected}
+                      onCheckedChange={(v) => t.handleToggleRow(patient.id, !!v)}
+                      aria-label="Select row item"
                     />
                     <div>
                       <h4 className="font-semibold text-foreground tracking-tight">{patient.name}</h4>
@@ -292,34 +86,12 @@ export function PatientsTable({ patients, onUpdatePatient, onDeletePatient }: Pa
                     </div>
                   </div>
 
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 p-0 rounded-md" disabled={deletingId === patient.id}>
-                        {deletingId === patient.id ? (
-                          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                        ) : (
-                          <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
-                        )}
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-44">
-                      <DropdownMenuLabel>Patient Actions</DropdownMenuLabel>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem className="gap-2 cursor-pointer">
-                        <Eye className="h-4 w-4 text-muted-foreground" /> View Chart
-                      </DropdownMenuItem>
-                      <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => setPatientToEdit(patient)}>
-                        <Edit className="h-4 w-4 text-muted-foreground" /> Edit Profile
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem 
-                        onClick={() => setPatientToDelete(patient)}
-                        className="gap-2 text-destructive focus:text-destructive focus:bg-destructive/10 cursor-pointer"
-                      >
-                        <Trash2 className="h-4 w-4" /> Delete Records
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  <RowActions
+                    patient={patient}
+                    onUpdatePatient={onUpdatePatient}
+                    onDeletePatient={onDeletePatient}
+                    setSelectedIds={t.setSelectedIds}
+                  />
                 </div>
 
                 <div className="grid grid-cols-2 gap-2 pt-2 border-t text-xs text-muted-foreground">
@@ -347,126 +119,96 @@ export function PatientsTable({ patients, onUpdatePatient, onDeletePatient }: Pa
         )}
       </div>
 
-      {/* 💻 Desktop Viewport Layout Mode Container */}
+      {/* 💻 Desktop Grid Mode Data Table Viewport */}
       <div className="hidden md:block rounded-md border bg-card max-h-[600px] overflow-y-auto relative shadow-2xs">
         <Table>
           <TableHeader className="sticky top-0 z-10 bg-card border-b shadow-xs">
             <TableRow className="bg-muted/10 hover:bg-transparent">
               <TableHead className="w-[50px] h-12 bg-card">
-                <Checkbox 
-                  checked={isAllSelected ? true : isSomeSelected ? "indeterminate" : false} 
-                  onCheckedChange={(v) => handleToggleAll(!!v)} 
-                  aria-label="Select all rows" 
+                <Checkbox
+                  checked={t.isAllSelected ? true : t.isSomeSelected ? "indeterminate" : false}
+                  onCheckedChange={(v) => t.handleToggleAll(!!v)}
+                  aria-label="Select all rows"
                 />
               </TableHead>
-              
+
               <TableHead className="h-12 min-w-[200px] bg-card">
-                <div className="flex items-center justify-between gap-1">
-                  <Button variant="ghost" size="sm" className="-ml-3 h-8 gap-1.5 hover:bg-muted font-semibold text-xs uppercase tracking-wider" onClick={() => setSortOrder(p => p === "asc" ? "desc" : "asc")}>
-                    Patient Name
-                    <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground" />
-                  </Button>
-                  
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-7 w-7 p-0 text-muted-foreground">
-                        <Filter className={cn("h-3.5 w-3.5", nameFilter && "text-primary fill-primary/10")} />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-60 p-3 space-y-2" align="start">
-                      <Label className="text-xs font-medium">Search matching name</Label>
-                      <Input placeholder="Type standard string value..." value={nameFilter} onChange={(e) => { setNameFilter(e.target.value); setCurrentPage(1); }} className="h-8 text-xs"/>
-                      {nameFilter && <Button onClick={() => { setNameFilter(""); setCurrentPage(1); }} variant="ghost" className="h-6 w-full text-xs text-destructive hover:bg-destructive/5">Clear Filter</Button>}
-                    </PopoverContent>
-                  </Popover>
-                </div>
+                <NameHeaderFilter
+                  nameFilter={t.nameFilter}
+                  setNameFilter={t.setNameFilter}
+                  setCurrentPage={t.setCurrentPage}
+                  setSortOrder={t.setSortOrder}
+                />
               </TableHead>
 
-              {visibleColumns.genderAge && (
+              {t.visibleColumns.genderAge && (
                 <TableHead className="h-12 bg-card">
-                  <div className="flex items-center justify-between gap-1 text-xs uppercase tracking-wider font-semibold text-muted-foreground">
-                    <span>Gender / Age</span>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-7 w-7 p-0 text-muted-foreground">
-                          <Filter className={cn("h-3.5 w-3.5", (genderFilter !== "all" || ageCondition !== "none") && "text-primary fill-primary/10")} />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-64 p-3 space-y-3" align="start">
-                        <div className="space-y-1">
-                          <Label className="text-xs font-medium">Filter Gender Selection</Label>
-                          <Select value={genderFilter} onValueChange={(v) => { setGenderFilter(v); setCurrentPage(1); }}>
-                            <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="all">All Genders</SelectItem>
-                              <SelectItem value="male">Male</SelectItem>
-                              <SelectItem value="female">Female</SelectItem>
-                              <SelectItem value="other">Other</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="space-y-1.5">
-                          <Label className="text-xs font-medium">Age Condition Matrix</Label>
-                          <div className="grid grid-cols-2 gap-2">
-                            <Select value={ageCondition} onValueChange={(v: any) => { setAgeCondition(v); setCurrentPage(1); }}>
-                              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="none">No Filter</SelectItem>
-                                <SelectItem value="gt">Greater Than (&gt;)</SelectItem>
-                                <SelectItem value="lt">Less Than (&lt;)</SelectItem>
-                                <SelectItem value="eq">Equals (=)</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <Input type="number" disabled={ageCondition === "none"} placeholder="Age..." value={ageValue} onChange={(e) => { setAgeValue(e.target.value); setCurrentPage(1); }} className="h-8 text-xs" />
-                          </div>
-                        </div>
-                        {(genderFilter !== "all" || ageCondition !== "none") && (
-                          <Button onClick={() => { setGenderFilter("all"); setAgeCondition("none"); setAgeValue(""); setCurrentPage(1); }} variant="ghost" className="h-7 w-full text-xs text-destructive hover:bg-destructive/5">
-                            Reset Metric Filter
-                          </Button>
-                        )}
-                      </PopoverContent>
-                    </Popover>
-                  </div>
+                  <MetricsHeaderFilter
+                    genderFilter={t.genderFilter}
+                    setGenderFilter={t.setGenderFilter}
+                    ageCondition={t.ageCondition}
+                    setAgeCondition={t.setAgeCondition}
+                    ageValue={t.ageValue}
+                    setAgeValue={t.setAgeValue}
+                    setCurrentPage={t.setCurrentPage}
+                  />
                 </TableHead>
               )}
-              
-              {visibleColumns.contactInfo && (
+
+              {t.visibleColumns.contactInfo && (
                 <TableHead className="h-12 min-w-[200px] bg-card">
                   <div className="flex items-center justify-between gap-1 text-xs uppercase tracking-wider font-semibold text-muted-foreground">
                     <span>Contact Info</span>
-                    <Popover>
+                    <ShadcnPopover>
                       <PopoverTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-7 w-7 p-0 text-muted-foreground">
-                          <Filter className={cn("h-3.5 w-3.5", contactFilter && "text-primary fill-primary/10")} />
-                        </Button>
+                        <ShadcnButton variant="ghost" size="icon" className="h-7 w-7 p-0 text-muted-foreground">
+                          <Filter className={cn("h-3.5 w-3.5", t.contactFilter && "text-primary fill-primary/10")} />
+                        </ShadcnButton>
                       </PopoverTrigger>
                       <PopoverContent className="w-60 p-3 space-y-2" align="start">
-                        <Label className="text-xs font-medium">Search Email or Phone</Label>
-                        <Input placeholder="Type email or digits..." value={contactFilter} onChange={(e) => { setContactFilter(e.target.value); setCurrentPage(1); }} className="h-8 text-xs"/>
-                        {contactFilter && <Button onClick={() => { setContactFilter(""); setCurrentPage(1); }} variant="ghost" className="h-6 w-full text-xs text-destructive hover:bg-destructive/5">Clear Filter</Button>}
+                        <ShadcnLabel className="text-xs font-medium">Search Email or Phone</ShadcnLabel>
+                        <ShadcnInput 
+                          placeholder="Type email or digits..." 
+                          value={t.contactFilter} 
+                          onChange={(e) => { t.setContactFilter(e.target.value); t.setCurrentPage(1); }} 
+                          className="h-8 text-xs"
+                        />
+                        {t.contactFilter && (
+                          <ShadcnButton onClick={() => { t.setContactFilter(""); t.setCurrentPage(1); }} variant="ghost" className="h-6 w-full text-xs text-destructive hover:bg-destructive/5">
+                            Clear Filter
+                          </ShadcnButton>
+                        )}
                       </PopoverContent>
-                    </Popover>
+                    </ShadcnPopover>
                   </div>
                 </TableHead>
               )}
 
-              {visibleColumns.regDate && (
+              {t.visibleColumns.regDate && (
                 <TableHead className="h-12 bg-card">
-                   <div className="flex items-center justify-between gap-1 text-xs uppercase tracking-wider font-semibold text-muted-foreground">
+                  <div className="flex items-center justify-between gap-1 text-xs uppercase tracking-wider font-semibold text-muted-foreground">
                     <span>Registration Date</span>
-                    <Popover>
+                    <ShadcnPopover>
                       <PopoverTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-7 w-7 p-0 text-muted-foreground">
-                          <Filter className={cn("h-3.5 w-3.5", regDateFilter && "text-primary fill-primary/10")} />
-                        </Button>
+                        <ShadcnButton variant="ghost" size="icon" className="h-7 w-7 p-0 text-muted-foreground">
+                          <Filter className={cn("h-3.5 w-3.5", t.regDateFilter && "text-primary fill-primary/10")} />
+                        </ShadcnButton>
                       </PopoverTrigger>
                       <PopoverContent className="w-60 p-3 space-y-2" align="start">
-                        <Label className="text-xs font-medium">Search exact date string</Label>
-                        <Input placeholder="e.g. 06/15/2026" value={regDateFilter} onChange={(e) => { setRegDateFilter(e.target.value); setCurrentPage(1); }} className="h-8 text-xs"/>
-                        {regDateFilter && <Button onClick={() => { setRegDateFilter(""); setCurrentPage(1); }} variant="ghost" className="h-6 w-full text-xs text-destructive hover:bg-destructive/5">Clear Filter</Button>}
+                        <ShadcnLabel className="text-xs font-medium">Search exact date string</ShadcnLabel>
+                        <ShadcnInput 
+                          placeholder="e.g. 01/07/2026" 
+                          value={t.regDateFilter} 
+                          onChange={(e) => { t.setRegDateFilter(e.target.value); t.setCurrentPage(1); }} 
+                          className="h-8 text-xs"
+                        />
+                        {t.regDateFilter && (
+                          <ShadcnButton onClick={() => { t.setRegDateFilter(""); t.setCurrentPage(1); }} variant="ghost" className="h-6 w-full text-xs text-destructive hover:bg-destructive/5">
+                            Clear Filter
+                          </ShadcnButton>
+                        )}
                       </PopoverContent>
-                    </Popover>
+                    </ShadcnPopover>
                   </div>
                 </TableHead>
               )}
@@ -474,37 +216,40 @@ export function PatientsTable({ patients, onUpdatePatient, onDeletePatient }: Pa
               <TableHead className="w-[50px] h-12 bg-card"></TableHead>
             </TableRow>
           </TableHeader>
-          
+
           <TableBody>
-            {paginatedPatients.length === 0 ? (
+            {t.paginatedPatients.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} className="h-24 text-center text-muted-foreground text-sm">
                   No matching patients found within specified metrics.
                 </TableCell>
               </TableRow>
             ) : (
-              paginatedPatients.map((patient) => {
-                const age = parseAge(patient.dob);
-                const isSelected = selectedIds.includes(patient.id);
+              t.paginatedPatients.map((patient) => {
+                const age = t.parseAge(patient.dob);
+                const isSelected = t.selectedIds.includes(patient.id);
 
                 return (
                   <TableRow key={patient.id} data-state={isSelected && "selected"} className="hover:bg-muted/50 transition-colors">
                     <TableCell className="py-3">
-                      <Checkbox 
-                        checked={isSelected} 
-                        onCheckedChange={(v) => handleToggleRow(patient.id, !!v)} 
-                        aria-label="Select row" 
+                      <Checkbox
+                        checked={isSelected}
+                        onCheckedChange={(v) => t.handleToggleRow(patient.id, !!v)}
+                        aria-label="Select row selection state"
                       />
                     </TableCell>
                     <TableCell className="py-3 font-semibold text-foreground tracking-tight">
                       {patient.name}
                     </TableCell>
-                    {visibleColumns.genderAge && (
+                    {t.visibleColumns.genderAge && (
                       <TableCell className="py-3 capitalize text-muted-foreground text-sm">
-                        {patient.gender} <span className="text-xs font-medium bg-muted/60 px-1.5 py-0.5 rounded-sm ml-1 text-foreground">{age !== null ? `${age} Yrs` : "N/A"}</span>
+                        {patient.gender}{" "}
+                        <span className="text-xs font-medium bg-muted/60 px-1.5 py-0.5 rounded-sm ml-1 text-foreground">
+                          {age !== null ? `${age} Yrs` : "N/A"}
+                        </span>
                       </TableCell>
                     )}
-                    {visibleColumns.contactInfo && (
+                    {t.visibleColumns.contactInfo && (
                       <TableCell className="py-3">
                         <div className="flex flex-col text-xs">
                           <span className="text-foreground font-medium">{patient.phone}</span>
@@ -512,41 +257,18 @@ export function PatientsTable({ patients, onUpdatePatient, onDeletePatient }: Pa
                         </div>
                       </TableCell>
                     )}
-                    {visibleColumns.regDate && (
-                      <TableCell className="py-3 text-muted-foreground text-sm">
-                        {patient.createdAt}
-                      </TableCell>
+                    {t.visibleColumns.regDate && (
+                      <TableCell className="py-3 text-muted-foreground text-sm">{patient.createdAt}</TableCell>
                     )}
-                    
+
+                    {/* Perfectly clean integration with RowActions container */}
                     <TableCell className="py-3 text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0 hover:bg-muted rounded-md" disabled={deletingId === patient.id}>
-                            {deletingId === patient.id ? (
-                              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                            ) : (
-                              <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
-                            )}
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-44">
-                          <DropdownMenuLabel>Patient Actions</DropdownMenuLabel>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem className="gap-2 cursor-pointer">
-                            <Eye className="h-4 w-4 text-muted-foreground" /> View Chart
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => setPatientToEdit(patient)}>
-                            <Edit className="h-4 w-4 text-muted-foreground" /> Edit Profile
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem 
-                            onClick={() => setPatientToDelete(patient)}
-                            className="gap-2 text-destructive focus:text-destructive focus:bg-destructive/10 cursor-pointer"
-                          >
-                            <Trash2 className="h-4 w-4" /> Delete Records
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                      <RowActions
+                        patient={patient}
+                        onUpdatePatient={onUpdatePatient}
+                        onDeletePatient={onDeletePatient}
+                        setSelectedIds={t.setSelectedIds}
+                      />
                     </TableCell>
                   </TableRow>
                 );
@@ -556,85 +278,14 @@ export function PatientsTable({ patients, onUpdatePatient, onDeletePatient }: Pa
         </Table>
       </div>
 
-      {/* Table Footer Pagination controls */}
-      <div className="flex flex-col sm:flex-row items-center justify-between text-sm text-muted-foreground gap-4 px-1 pt-2">
-        <div>
-          {selectedVisibleCount} of {processedPatients.length} row(s) selected.
-        </div>
-        
-        <div className="flex flex-wrap items-center justify-center gap-2">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="h-8 bg-background" 
-            onClick={() => setCurrentPage(p => Math.max(p - 1, 1))}
-            disabled={activePage === 1}
-          >
-            Previous
-          </Button>
-
-          <div className="flex items-center gap-1">
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
-              <Button
-                key={pageNum}
-                variant={activePage === pageNum ? "secondary" : "ghost"}
-                size="icon"
-                className="h-8 w-8 text-xs font-medium rounded-md"
-                onClick={() => setCurrentPage(pageNum)}
-              >
-                {pageNum}
-              </Button>
-            ))}
-          </div>
-
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="h-8 bg-background" 
-            onClick={() => setCurrentPage(p => Math.min(p + 1, totalPages))}
-            disabled={activePage === totalPages}
-          >
-            Next
-          </Button>
-        </div>
-      </div>
-
-      {/* 🛑 SHADCN ALERT DIALOG MODAL FOR DELETIONS */}
-      <AlertDialog open={!!patientToDelete} onOpenChange={(open) => !open && setPatientToDelete(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently delete the clinical records for{" "}
-              <strong className="text-foreground">{patientToDelete?.name}</strong>. This operational action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={handleConfirmedDelete} 
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Delete Record
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* 📝 SHADCN DIALOG FOR EDIT PROFILE MODAL */}
-      <Dialog open={!!patientToEdit} onOpenChange={(open) => !open && setPatientToEdit(null)}>
-        <DialogContent className="sm:max-w-[600px] p-0 border-none bg-transparent">
-          {patientToEdit && (
-            <PatientFormModal 
-              patientToEdit={patientToEdit} 
-              onUpdatePatient={(updatedPatient) => {
-                onUpdatePatient(updatedPatient);
-                setPatientToEdit(null);
-              }}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
+      {/* Pagination Footer Controls Component Block */}
+      <TablePagination
+        selectedVisibleCount={t.selectedVisibleCount}
+        totalFilteredRecords={t.processedPatients.length}
+        currentPage={t.currentPage}
+        setCurrentPage={t.setCurrentPage}
+        totalPages={t.totalPages}
+      />
     </div>
   );
 }
