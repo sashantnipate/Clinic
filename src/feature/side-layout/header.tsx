@@ -1,4 +1,3 @@
-// src/feature/side-layout/header.tsx
 'use client'
 import { OrganizationSwitcher, UserButton } from "@clerk/nextjs";
 import { useEffect, useState } from "react";
@@ -6,12 +5,14 @@ import { Menu, Sun, Moon } from "lucide-react";
 import { useSidebar } from "./sidebar-context";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
+import { usePathname } from "next/navigation";
 
 export function Header() {
     const [scrolled, setScrolled] = useState(false);
     const [mounted, setMounted] = useState(false);
     const { toggleSidebar } = useSidebar();
     const { theme, setTheme } = useTheme();
+    const pathname = usePathname();
 
     useEffect(() => {
         setMounted(true);
@@ -43,7 +44,9 @@ export function Header() {
                 </button>
                 
                 <div className="scale-125 origin-left flex items-center max-md:absolute max-md:left-1/2 max-md:-translate-x-1/2">
-                    <OrganizationSwitcher />
+                    <OrganizationSwitcher 
+                        afterSelectOrganizationUrl={`/sync-workspace?redirect=${encodeURIComponent(pathname)}`}
+                    />
                 </div>
             </div>
 

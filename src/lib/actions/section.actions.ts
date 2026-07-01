@@ -34,25 +34,44 @@ export async function saveRegistrationSection(token: string, params: SaveSection
 
     await connectToDB();
 
-    const targetObjectId = mongoose.Types.ObjectId.isValid(_id || "") 
-      ? new mongoose.Types.ObjectId(_id) 
-      : new mongoose.Types.ObjectId();
+    const currentOrgId = new mongoose.Types.ObjectId(session.ownerOrgId);
+    let updatedSection;
 
-    const updateData: any = {
-      ownerOrgId: new mongoose.Types.ObjectId(session.ownerOrgId),
-      title: title.trim(),
-      fields: fields,
-    };
+    if (_id && mongoose.Types.ObjectId.isValid(_id)) {
+      const targetId = new mongoose.Types.ObjectId(_id);
 
-    if (isActive !== undefined) {
-      updateData.isActive = isActive;
+      // 1. Authenticate ownership explicitly before running updates
+      const existingDoc = await RegistrationSection.findOne({ _id: targetId });
+
+      if (existingDoc && !existingDoc.ownerOrgId.equals(currentOrgId)) {
+        return { success: false, error: "Access denied: This section belongs to a different workspace." };
+      }
+
+      // 2. Perform a standard update without upsert to bypass the duplicate insert constraint
+      const updateData: any = {
+        title: title.trim(),
+        fields: fields,
+      };
+      if (isActive !== undefined) updateData.isActive = isActive;
+
+      updatedSection = await RegistrationSection.findOneAndUpdate(
+        { _id: targetId, ownerOrgId: currentOrgId },
+        updateData,
+        { new: true } // Same as returnDocument: 'after'
+      );
+    } else {
+      // 3. Fall through to an intentional creation route if no valid ID exists
+      updatedSection = await RegistrationSection.create({
+        ownerOrgId: currentOrgId,
+        title: title.trim(),
+        fields: fields,
+        isActive: isActive !== undefined ? isActive : true,
+      });
     }
 
-    const updatedSection = await RegistrationSection.findOneAndUpdate(
-      { _id: targetObjectId, ownerOrgId: new mongoose.Types.ObjectId(session.ownerOrgId) },
-      updateData,
-      { upsert: true, new: true }
-    );
+    if (!updatedSection) {
+      return { success: false, error: "Target document layout could not be found or processed." };
+    }
 
     return { 
       success: true, 
@@ -60,7 +79,7 @@ export async function saveRegistrationSection(token: string, params: SaveSection
     };
 
   } catch (error: any) {
-    console.error(error);
+    console.error("Save section error detail:", error);
     return { success: false, error: error.message || "Database fault" };
   }
 }
