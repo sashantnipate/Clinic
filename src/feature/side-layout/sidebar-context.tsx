@@ -6,15 +6,16 @@ import { useIsMobile } from "@/hooks/use-mobile";
 interface SidebarContextType {
   isCollapsed: boolean;
   toggleSidebar: () => void;
+  setCollapsed: (collapsed: boolean) => void;
 }
 
 const SidebarContext = createContext<SidebarContextType | undefined>(undefined);
 
 export function SidebarProvider({ children }: { children: React.ReactNode }) {
   const isMobile = useIsMobile();
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(true);
 
-  // Auto-collapse sidebar on smaller screens
+  // Auto-collapse sidebar by default on smaller mobile breakpoints
   useEffect(() => {
     if (isMobile !== undefined) {
       setIsCollapsed(isMobile);
@@ -22,9 +23,10 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
   }, [isMobile]);
 
   const toggleSidebar = () => setIsCollapsed((prev) => !prev);
+  const setCollapsed = (collapsed: boolean) => setIsCollapsed(collapsed);
 
   return (
-    <SidebarContext.Provider value={{ isCollapsed, toggleSidebar }}>
+    <SidebarContext.Provider value={{ isCollapsed, toggleSidebar, setCollapsed }}>
       {children}
     </SidebarContext.Provider>
   );

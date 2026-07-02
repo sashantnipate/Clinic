@@ -4,6 +4,7 @@ import { Header } from "@/feature/side-layout/header";
 import { SidebarProvider } from "@/feature/side-layout/sidebar-context";
 import { getNativeJWTString } from "@/lib/actions/auth.actions";
 import { LayoutGuardian } from "@/components/layout-guardian"; 
+import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 
 export default async function DashboardLayout({
@@ -11,16 +12,22 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  // 1. Fetch the raw signed JWT token string seamlessly using the server-side action context
-  const session = await getNativeJWTString();
-
-  // 2. If Clerk is unauthenticated or user documents are completely missing, reject page render immediately
-  if (!session.success || !session.token) {
+  // 1. Rely strictly on Clerk for the first layer of auth protection
+  // This ensures we only kick completely unauthenticated users to the login screen
+  const { userId } = await auth();
+  if (!userId) {
     redirect("/sign-in");
   }
 
+  // 2. Try to get the custom MongoDB token
+  const session = await getNativeJWTString();
+  
+  // 3. DO NOT redirect to sign-in here! If it fails, just pass an empty string.
+  // This stops the infinite Clerk <SignIn /> loop.
+  const tokenValue = session.success && session.token ? session.token : "";
+
   return (
-    <LayoutGuardian serverToken={session.token}>
+    <LayoutGuardian serverToken={tokenValue}>
       <SidebarProvider>
         <div className="min-h-screen bg-background">
           <Header />

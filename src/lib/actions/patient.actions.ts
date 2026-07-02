@@ -112,3 +112,41 @@ export async function deletePatientRecord(token: string, id: string) {
     return { success: false, error: error.message || "Database fault" };
   }
 }
+
+export async function getPatientById(token: string, id: string) {
+  try {
+    const session = await verifyJWTString(token);
+    if (!session || !session.ownerOrgId) {
+      return { success: false, error: "Unauthorized" };
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return { success: false, error: "Invalid patient record ID format" };
+    }
+
+    await connectToDB();
+
+    const currentOrgObjectId = new mongoose.Types.ObjectId(session.ownerOrgId);
+
+    // Enforce multi-tenant access restriction boundaries matrix
+    const patient = await Patient.findOne({
+      _id: new mongoose.Types.ObjectId(id),
+      $or: [
+        { ownerOrgId: currentOrgObjectId },
+        { sharedWithOrgs: currentOrgObjectId } // Checks if organization ID exists in the shared array
+      ]
+    }).lean();
+
+    if (!patient) {
+      return { success: false, error: "Patient record not found or access denied" };
+    }
+
+    return {
+      success: true,
+      patient: JSON.parse(JSON.stringify(patient)),
+    };
+  } catch (error: any) {
+    console.error("Failed to fetch patient detail logs:", error);
+    return { success: false, error: error.message || "Database fault" };
+  }
+}

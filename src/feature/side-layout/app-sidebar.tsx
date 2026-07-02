@@ -1,79 +1,64 @@
 "use client";
 
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  Calendar,
-  CreditCard,
-  FileText,
-  FlaskConical,
-  LayoutDashboard,
-  Pill,
-  Settings,
-  UserRound,
-  Users,
-} from "lucide-react";
-import { useSidebar } from "./sidebar-context";
-import { useIsMobile } from "@/hooks/use-mobile";
+import { useAuth } from "@clerk/nextjs";
 import { cn } from "@/lib/utils";
+import { Users, LayoutGrid, FileSpreadsheet, Settings, Building2, Pill } from "lucide-react";
 
-const items = [
-  { title: "Dashboard", icon: LayoutDashboard, href: "/" },
-  { title: "Patients", icon: Users, href: "/patients" },
-  { title: "Custom Forms", icon: FileText, href: "/forms" },
-  { title: "Appointments", icon: Calendar, href: "/appointments" },
-  { title: "Doctors", icon: UserRound, href: "/doctors" },
-  { title: "Billing", icon: CreditCard, href: "/billing" },
-  { title: "Pharmacy", icon: Pill, href: "/pharmacy" },
-  { title: "Lab Reports", icon: FlaskConical, href: "/lab-reports" },
-  { title: "Settings", icon: Settings, href: "/settings" },
+const ALL_AVAILABLE_TABS = [
+  { href: "/", label: "Dashboard", icon: LayoutGrid },
+  { href: "/patients", label: "Patients", icon: Users },
+  { href: "/forms", label: "Custom Forms", icon: FileSpreadsheet },
+  { href: "/pharmacy", label: "Pharmacy", icon: Pill },
+  { href: "/clinic-profile", label: "Clinic Profile", icon: Building2 }, // 👈 Added for Clinic Configuration
+  { href: "/settings", label: "Access Settings", icon: Settings },       // 👈 Focused strictly on Access/Roles
 ];
 
 export default function AppSidebar() {
   const pathname = usePathname();
-  const { isCollapsed, toggleSidebar } = useSidebar();
-  const isMobile = useIsMobile();
+  const { orgRole } = useAuth();
+  const [allowedTabs, setAllowedTabs] = useState<string[]>([]);
 
-  const handleLinkClick = () => {
-    // Only close the sidebar on link click if the user is on a mobile screen
-    if (isMobile) {
-      toggleSidebar();
+  const isAdmin = orgRole === "org:admin" || orgRole === "admin";
+
+  useEffect(() => {
+    const savedTabs = localStorage.getItem("clinic_allowed_tabs");
+    if (savedTabs) {
+      setAllowedTabs(JSON.parse(savedTabs));
+    } else {
+      // Clean baseline fallbacks excluding removed tabs
+      setAllowedTabs(["/", "/patients", "/clinic-profile"]);
     }
-  };
+  }, []);
 
   return (
-    <aside
-      className={cn(
-        "bg-background transition-all duration-300 ease-in-out shrink-0 overflow-hidden",
-        isCollapsed 
-          ? "w-0 opacity-0 pointer-events-none" 
-          : "w-60 opacity-100"
-      )}
-    >
-      <div className="py-4 px-4 w-60">
-        <nav className="space-y-1">
-          {items.map((item) => {
-            const isActive = pathname === item.href;
+    <aside className="w-60 shrink-0 pr-4 min-h-[calc(100vh-4rem)] hidden md:block pt-6 text-foreground antialiased bg-background">
+      <nav className="space-y-1">
+        {ALL_AVAILABLE_TABS.map((item) => {
+          const hasAccess = isAdmin || allowedTabs.includes(item.href);
+          if (!hasAccess) return null;
 
-            return (
-              <Link
-                key={item.title}
-                href={item.href}
-                onClick={handleLinkClick}
-                className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all duration-200 w-full",
-                  isActive
-                    ? "bg-card border shadow-sm"
-                    : "hover:bg-accent hover:text-accent-foreground"
-                )}
-              >
-                <item.icon className="h-5 w-5 shrink-0" />
-                <span className="truncate">{item.title}</span>
-              </Link>
-            );
-          })}
-        </nav>
-      </div>
+          const isActive = pathname === item.href;
+
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={cn(
+                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                isActive
+                  ? "bg-card border shadow-xs text-foreground font-semibold"
+                  : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+              )}
+            >
+              <item.icon className="h-4 w-4 shrink-0" />
+              <span>{item.label}</span>
+            </Link>
+          );
+        })}
+      </nav>
     </aside>
   );
 }

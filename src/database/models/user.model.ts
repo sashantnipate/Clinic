@@ -1,5 +1,4 @@
-// src/models/User.ts
-import { Schema, model, models } from "mongoose";
+import { Schema, Types, model, models } from "mongoose";
 
 export interface IUser {
   _id: string;
@@ -11,6 +10,8 @@ export interface IUser {
   imageUrl?: string;
   password?: string | null;
   authProvider: 'google' | 'credentials';
+  departments: Types.ObjectId[];
+  visibleTabs: string[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -28,7 +29,13 @@ const UserSchema = new Schema<IUser>(
       type: String, 
       enum: ['google', 'credentials'], 
       default: 'google' 
-    }
+    },
+    departments: [
+      { type: Schema.Types.ObjectId, ref: "Department" } //  Links back to the structural settings
+    ],
+    visibleTabs: [
+      { type: String, default: ["/", "/patients"] } // Core fallback defaults
+    ],
   },
   { timestamps: true }
 );

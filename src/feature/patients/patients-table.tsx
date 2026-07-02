@@ -16,6 +16,7 @@ import { TableFilters, NameHeaderFilter, MetricsHeaderFilter } from "./component
 import { RowActions } from "./components/row-actions";
 import { TablePagination } from "./components/table-pagination";
 import { Patient } from "./types";
+import Link from "next/link";
 
 interface PatientsTableProps {
   patients: Patient[];
@@ -238,9 +239,11 @@ export function PatientsTable({ patients, onUpdatePatient, onDeletePatient }: Pa
                         aria-label="Select row selection state"
                       />
                     </TableCell>
-                    <TableCell className="py-3 font-semibold text-foreground tracking-tight">
-                      {patient.name}
-                    </TableCell>
+                      <TableCell className="py-3 font-semibold text-foreground tracking-tight">
+                        <Link href={`/patients/${patient.id}`} className="hover:text-primary hover:underline transition-colors cursor-pointer">
+                          {patient.name}
+                        </Link>
+                      </TableCell>
                     {t.visibleColumns.genderAge && (
                       <TableCell className="py-3 capitalize text-muted-foreground text-sm">
                         {patient.gender}{" "}
