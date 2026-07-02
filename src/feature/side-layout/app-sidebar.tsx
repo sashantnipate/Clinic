@@ -12,8 +12,8 @@ const ALL_AVAILABLE_TABS = [
   { href: "/patients", label: "Patients", icon: Users },
   { href: "/forms", label: "Custom Forms", icon: FileSpreadsheet },
   { href: "/pharmacy", label: "Pharmacy", icon: Pill },
-  { href: "/clinic-profile", label: "Clinic Profile", icon: Building2 }, // 👈 Added for Clinic Configuration
-  { href: "/settings", label: "Access Settings", icon: Settings },       // 👈 Focused strictly on Access/Roles
+  { href: "/clinic-profile", label: "Clinic Profile", icon: Building2 }, 
+  { href: "/settings", label: "Access Settings", icon: Settings },       
 ];
 
 export default function AppSidebar() {
@@ -24,14 +24,14 @@ export default function AppSidebar() {
   const isAdmin = orgRole === "org:admin" || orgRole === "admin";
 
   useEffect(() => {
-    const savedTabs = localStorage.getItem("clinic_allowed_tabs");
-    if (savedTabs) {
-      setAllowedTabs(JSON.parse(savedTabs));
+    // Reads directly from local storage values saved by the layout guardian
+    const savedTabsRaw = localStorage.getItem("clinic_allowed_tabs");
+    if (savedTabsRaw) {
+      setAllowedTabs(JSON.parse(savedTabsRaw));
     } else {
-      // Clean baseline fallbacks excluding removed tabs
-      setAllowedTabs(["/", "/patients", "/clinic-profile"]);
+      setAllowedTabs([]);
     }
-  }, []);
+  }, [pathname]);
 
   return (
     <aside className="w-60 shrink-0 pr-4 min-h-[calc(100vh-4rem)] hidden md:block pt-6 text-foreground antialiased bg-background">
