@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -16,42 +16,72 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Shield, Plus, Pencil, Trash2, Loader2, LayoutGrid } from "lucide-react";
 import { SIDEBAR_TABS } from "@/constants/sidebar-tabs";
-import { saveRoleAction, getRolesAction, deleteRoleAction } from "@/lib/actions/role.actions";
+import {
+  saveRoleAction,
+  getRolesAction,
+  deleteRoleAction,
+} from "@/lib/actions/role.actions";
 
 export function RoleConfigPanel() {
   const [roles, setRoles] = useState<any[]>([]);
   const [roleName, setName] = useState("");
   const [description, setDescription] = useState("");
   const [selectedTabs, setSelectedTabs] = useState<string[]>([]);
-  
+
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingRoleId, setEditingRoleId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+
+  const [deleteAlertOpen, setDeleteAlertOpen] = useState(false);
+  const [roleIdToDelete, setRoleIdToDelete] = useState<string | null>(null);
+  const [roleNameToDelete, setRoleNameToDelete] = useState("");
 
   useEffect(() => {
     async function loadRoles() {
       try {
         const token = localStorage.getItem("clinic_jwt") || "";
         const res = await getRolesAction(token);
+
         if (res.success && res.data) {
           setRoles(res.data);
+        } else {
+          toast.error(res.error || "Failed to load roles.");
         }
       } catch (err) {
         console.error("Failed to load schema roles:", err);
+        toast.error("Failed to load roles.");
       } finally {
         setIsLoading(false);
       }
     }
+
     loadRoles();
   }, []);
 
   const handleToggleTab = (tabId: string) => {
-    setSelectedTabs(prev =>
-      prev.includes(tabId) ? prev.filter(t => t !== tabId) : [...prev, tabId]
+    setSelectedTabs((prev) =>
+      prev.includes(tabId) ? prev.filter((t) => t !== tabId) : [...prev, tabId]
     );
+  };
+
+  const handleResetForm = () => {
+    setEditingRoleId(null);
+    setName("");
+    setDescription("");
+    setSelectedTabs([]);
   };
 
   const handleOpenCreatePopup = () => {
@@ -61,7 +91,7 @@ export function RoleConfigPanel() {
 
   const handleStartEdit = (role: any) => {
     setEditingRoleId(role._id);
-    setName(role.name);
+    setName(role.name || "");
     setDescription(role.description || "");
     setSelectedTabs(role.allowedTabs || []);
     setDialogOpen(true);
@@ -69,10 +99,12 @@ export function RoleConfigPanel() {
 
   const handleSaveRole = async (e: React.FormEvent) => {
     e.preventDefault();
+
     if (!roleName.trim()) return;
 
     try {
       setIsSaving(true);
+
       const token = localStorage.getItem("clinic_jwt") || "";
       const res = await saveRoleAction(token, {
         id: editingRoleId || undefined,
@@ -83,119 +115,157 @@ export function RoleConfigPanel() {
 
       if (res.success && res.data) {
         if (editingRoleId) {
-          setRoles(prev => prev.map(r => r._id === editingRoleId ? res.data : r));
-          toast.success("Role configuration updated successfully.");
+          setRoles((prev) =>
+            prev.map((r) => (r._id === editingRoleId ? res.data : r))
+          );
+          toast.success("Role updated successfully.");
         } else {
-          setRoles(prev => [res.data, ...prev]);
-          toast.success("New role blueprint successfully deployed.");
+          setRoles((prev) => [res.data, ...prev]);
+          toast.success("Role created successfully.");
         }
+
         setDialogOpen(false);
         handleResetForm();
       } else {
-        toast.error(res.error || "Failed to save role configuration.");
+        toast.error(res.error || "Failed to save role.");
       }
     } catch (err) {
-      toast.error("Network communication fault.");
+      toast.error("Something went wrong.");
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handleDeleteRole = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this role profile?")) return;
+  const triggerDeleteAlert = (id: string, name: string) => {
+    setRoleIdToDelete(id);
+    setRoleNameToDelete(name);
+    setDeleteAlertOpen(true);
+  };
+
+  const handleConfirmedDelete = async () => {
+    if (!roleIdToDelete) return;
+
     try {
       const token = localStorage.getItem("clinic_jwt") || "";
-      const res = await deleteRoleAction(token, id);
+      const res = await deleteRoleAction(token, roleIdToDelete);
+
       if (res.success) {
-        setRoles(prev => prev.filter(r => r._id !== id));
-        toast.success("Role removed from workspace.");
+        setRoles((prev) => prev.filter((r) => r._id !== roleIdToDelete));
+        toast.success("Role deleted successfully.");
+      } else {
+        toast.error(res.error || "Failed to delete role.");
       }
     } catch {
-      toast.error("Failed to execute data modification chain.");
+      toast.error("Failed to delete role.");
+    } finally {
+      setDeleteAlertOpen(false);
+      setRoleIdToDelete(null);
+      setRoleNameToDelete("");
     }
   };
 
-  const handleResetForm = () => {
-    setEditingRoleId(null);
-    setName("");
-    setDescription("");
-    setSelectedTabs([]);
-  };
+  const renderedRoles = [...roles].sort((a, b) =>
+    (a.name || "").localeCompare(b.name || "")
+  );
 
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center p-8 gap-2 border border-dashed rounded-xl">
-        <Loader2 className="h-5 w-5 animate-spin text-primary" />
-        <span className="text-xs text-muted-foreground font-medium">Extracting facility role profiles...</span>
+      <div className="flex flex-col items-center justify-center rounded-xl border border-dashed bg-card p-6 gap-2">
+        <Loader2 className="h-4 w-4 animate-spin text-primary" />
+        <span className="text-xs font-medium text-muted-foreground">
+          Loading roles...
+        </span>
       </div>
     );
   }
 
   return (
-    <div className="w-full space-y-4 text-foreground antialiased">
-      
-      {/* HEADER CONTROL STRIP */}
-      <div className="flex items-center justify-between border-b pb-3">
+    <div className="w-full space-y-3 text-foreground antialiased">
+      <div className="flex items-center justify-between border-b pb-2">
         <div>
-          <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
             Workspace Security Archetypes
           </h3>
         </div>
-        <Button onClick={handleOpenCreatePopup} size="sm" className="h-9 text-xs font-semibold gap-1.5 px-4 shadow-xs">
-          <Plus className="h-4 w-4" /> Create New Role
+
+        <Button
+          onClick={handleOpenCreatePopup}
+          size="sm"
+          className="h-8 gap-1 px-3 text-xs font-semibold"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          Create New Role
         </Button>
       </div>
 
-      {/* POPUP METHOD MODAL CONTAINER: REPLICATES MATCHING GRID METRICS IN image_ddffff.png */}
-      <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if(!open) handleResetForm(); }}>
-        <DialogContent className="w-[95vw] md:max-w-4xl max-h-[90vh] overflow-y-auto p-6 will-change-transform antialiased">
-          <DialogHeader className="mb-2">
-            <DialogTitle className="text-base font-bold uppercase tracking-wider text-primary flex items-center gap-2">
-              <Shield className="h-4 w-4" /> {editingRoleId ? "Edit Role Blueprint Scope" : "Provision Security Blueprint"}
+      <Dialog
+        open={dialogOpen}
+        onOpenChange={(open) => {
+          setDialogOpen(open);
+          if (!open) handleResetForm();
+        }}
+      >
+        <DialogContent className="w-[95vw] max-h-[90vh] overflow-y-auto p-5 md:max-w-4xl">
+          <DialogHeader className="mb-1">
+            <DialogTitle className="flex items-center gap-1.5 text-sm font-bold uppercase tracking-wider text-primary">
+              <Shield className="h-4 w-4" />
+              {editingRoleId
+                ? "Edit Role Blueprint Scope"
+                : "Provision Security Blueprint"}
             </DialogTitle>
-            <DialogDescription>
-              Specify the role identity parameters and assign explicit application modular route filters directly below.
+            <DialogDescription className="text-xs">
+              Specify the role name and assign access to the desired application
+              views below.
             </DialogDescription>
           </DialogHeader>
 
-          <form onSubmit={handleSaveRole} className="space-y-6 pt-2">
-            
-            {/* Form Fields Section mirroring style parameters of image_ddffff.png */}
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="popupRoleName" className="text-xs uppercase font-bold tracking-wider text-muted-foreground flex items-center gap-1.5">
-                <LayoutGrid className="h-3.5 w-3.5 text-muted-foreground" /> Role Identity Name *
+          <form onSubmit={handleSaveRole} className="space-y-4 pt-1">
+            <div className="flex flex-col gap-1.5">
+              <Label
+                htmlFor="popupRoleName"
+                className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground"
+              >
+                <LayoutGrid className="h-3 w-3 text-muted-foreground" />
+                Role Identity Name *
               </Label>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 w-full">
+
+              <div className="grid w-full grid-cols-1 gap-2 md:grid-cols-2">
                 <Input
                   id="popupRoleName"
                   required
-                  placeholder="e.g., Insurance Coordinator, Senior Consultant"
-                  className="h-10 text-sm font-medium bg-background"
+                  placeholder="e.g., Insurance Coordinator"
+                  className="h-9 bg-background text-xs font-medium"
                   value={roleName}
                   onChange={(e) => setName(e.target.value)}
                 />
                 <Input
                   placeholder="Optional brief operational descriptor..."
-                  className="h-10 text-sm font-normal text-muted-foreground bg-background"
+                  className="h-9 bg-background text-xs font-normal text-muted-foreground"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                 />
               </div>
             </div>
 
-            {/* Alignment Layout Headers referencing input configuration grids of image_ddffff.png */}
-            <div className="space-y-2 pt-4 border-t">
-              <div className="grid grid-cols-12 gap-3 px-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground border-b pb-2">
+            <div className="space-y-1.5 pt-3 border-t">
+              <div className="grid grid-cols-12 gap-2 border-b px-1 pb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                 <div className="col-span-5">Workspace Navigation Tab</div>
                 <div className="col-span-4">Application Module Path</div>
                 <div className="col-span-3 text-center">Grant Access</div>
               </div>
 
-              <div className="divide-y divide-border/60 max-h-[240px] overflow-y-auto pr-1">
+              <div className="max-h-[200px] divide-y divide-border/60 overflow-y-auto pr-1">
                 {SIDEBAR_TABS.map((tab) => (
-                  <div key={tab.id} className="grid grid-cols-12 gap-3 py-2.5 items-center hover:bg-muted/10 px-2 rounded-md transition-colors">
-                    <div className="col-span-5 text-xs font-semibold text-foreground/90">{tab.label}</div>
-                    <div className="col-span-4 text-xs font-mono text-muted-foreground">{tab.id}</div>
+                  <div
+                    key={tab.id}
+                    className="grid grid-cols-12 items-center gap-2 rounded-sm px-1 py-2 transition-colors hover:bg-muted/10"
+                  >
+                    <div className="col-span-5 text-xs font-semibold text-foreground/90">
+                      {tab.label}
+                    </div>
+                    <div className="col-span-4 font-mono text-xs text-muted-foreground">
+                      {tab.id}
+                    </div>
                     <div className="col-span-3 flex justify-center">
                       <Checkbox
                         id={`popup-tab-check-${tab.id}`}
@@ -208,85 +278,170 @@ export function RoleConfigPanel() {
               </div>
             </div>
 
-            {/* Dialog Form Control Actions Footer Row */}
-            <DialogFooter className="pt-4 border-t gap-2 flex items-center justify-end bg-transparent">
-              <Button type="button" variant="outline" size="sm" onClick={() => setDialogOpen(false)} className="h-9 text-xs px-4">
+            <DialogFooter className="flex items-center justify-end gap-1.5 border-t bg-transparent pt-3">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setDialogOpen(false)}
+                className="h-8 px-3 text-xs"
+              >
                 Cancel
               </Button>
-              <Button type="submit" disabled={isSaving || !roleName.trim()} size="sm" className="h-9 text-xs font-semibold px-5 shadow-xs">
-                {isSaving ? "Persisting changes..." : editingRoleId ? "Update Blueprint" : "Deploy Role Blueprint"}
+              <Button
+                type="submit"
+                disabled={isSaving || !roleName.trim()}
+                size="sm"
+                className="h-8 px-4 text-xs font-semibold"
+              >
+                {isSaving
+                  ? "Persisting changes..."
+                  : editingRoleId
+                  ? "Update Blueprint"
+                  : "Deploy Role Blueprint"}
               </Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
 
-      {/* MATRIX ROLES PRINTOUT LIST */}
-      <Card className="border-muted/60 shadow-2xs bg-background">
-        <div className="p-3.5 bg-muted/30 text-xs font-bold uppercase tracking-wider text-muted-foreground border-b rounded-t-xl">
-          Configured Tenant System Roles Matrix ({roles.length})
-        </div>
-        <CardContent className="p-2 divide-y divide-border/50">
-          {roles.map((role) => (
-            <div key={role._id} className="p-4 space-y-3 transition-colors hover:bg-muted/10 rounded-lg">
-              
-              {/* ROW LINE 1: ROLE TITLE IDENTITY */}
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="text-sm font-bold text-foreground tracking-tight">{role.name}</h4>
-                  {role.description && <p className="text-xs text-muted-foreground mt-0.5">{role.description}</p>}
-                </div>
-              </div>
+      <AlertDialog open={deleteAlertOpen} onOpenChange={setDeleteAlertOpen}>
+        <AlertDialogContent className="p-5">
+          <AlertDialogHeader className="space-y-1">
+            <AlertDialogTitle className="text-sm font-bold">
+              Delete role?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-xs">
+              This will permanently delete{" "}
+              <strong className="font-semibold text-foreground">
+                {roleNameToDelete}
+              </strong>
+              . Members using this role may lose access to authorized pages.
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
 
-              {/* ROW LINE 2: ALL INDIVIDUAL GRANTED MODULE TABS + INLINE ACTION STRIPS */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-dashed border-border/60">
-                <div className="flex flex-wrap gap-1.5 items-center">
-                  <span className="text-[10px] tracking-wider font-semibold uppercase text-muted-foreground mr-1.5">Authorized Views:</span>
-                  {role.allowedTabs?.map((tabId: string) => {
-                    const label = SIDEBAR_TABS.find(t => t.id === tabId)?.label || tabId;
-                    return (
-                      <Badge key={tabId} variant="secondary" className="text-[11px] font-medium bg-muted/60 px-2 py-0.5 rounded border">
-                        {label}
-                      </Badge>
-                    );
-                  })}
-                  {(!role.allowedTabs || role.allowedTabs.length === 0) && (
-                    <span className="text-xs text-destructive font-medium italic">No workspace tabs linked.</span>
+          <AlertDialogFooter className="mt-2 gap-1.5">
+            <AlertDialogCancel
+              size="sm"
+              className="h-8 text-xs"
+              onClick={() => setRoleIdToDelete(null)}
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              size="sm"
+              onClick={handleConfirmedDelete}
+              className="h-8 bg-destructive text-xs text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete Role
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <div className="grid grid-cols-1 gap-2">
+        {renderedRoles.map((role) => (
+          <Card
+            key={role._id}
+            className="overflow-hidden rounded-lg border bg-card shadow-sm"
+          >
+            <CardContent className="px-4 py-3">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-start justify-between gap-3 md:items-center">
+                    <div className="min-w-0">
+                      <h4 className="truncate text-sm font-semibold text-foreground">
+                        {role.name}
+                      </h4>
+                      {role.description && (
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          {role.description}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="flex shrink-0 items-center gap-1.5 md:hidden">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleStartEdit(role)}
+                        className="h-8 px-2 text-xs"
+                      >
+                        <Pencil className="mr-1 h-3.5 w-3.5" />
+                        Edit
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => triggerDeleteAlert(role._id, role.name)}
+                        className="h-8 px-2 text-xs text-destructive hover:text-destructive"
+                      >
+                        <Trash2 className="mr-1 h-3.5 w-3.5" />
+                        Delete
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-1.5 md:max-w-[45%] md:justify-end">
+                  <span className="mr-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    Authorized Views:
+                  </span>
+
+                  {role.allowedTabs?.length > 0 ? (
+                    role.allowedTabs.map((tabId: string) => {
+                      const label =
+                        SIDEBAR_TABS.find((t) => t.id === tabId)?.label || tabId;
+
+                      return (
+                        <Badge
+                          key={tabId}
+                          variant="secondary"
+                          className="h-6 rounded-md border border-muted/60 bg-muted/40 px-2 text-[11px] font-medium text-muted-foreground"
+                        >
+                          {label}
+                        </Badge>
+                      );
+                    })
+                  ) : (
+                    <span className="text-[11px] italic text-destructive/80">
+                      None linked
+                    </span>
                   )}
                 </div>
 
-                {/* EDIT + DELETE ROW OPTIONS INTEGRATED DIRECTLY ON LINE TWO */}
-                <div className="flex items-center gap-1.5 self-end sm:self-center">
+                <div className="hidden shrink-0 items-center gap-1.5 md:flex">
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => handleStartEdit(role)}
-                    className="h-8 text-xs font-medium gap-1 text-muted-foreground hover:text-foreground hover:bg-muted"
+                    className="h-8 px-2 text-xs"
                   >
-                    <Pencil className="h-3.5 w-3.5" /> Edit
+                    <Pencil className="mr-1 h-3.5 w-3.5" />
+                    Edit
                   </Button>
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => handleDeleteRole(role._id)}
-                    className="h-8 text-xs font-medium gap-1 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                    onClick={() => triggerDeleteAlert(role._id, role.name)}
+                    className="h-8 px-2 text-xs text-destructive hover:text-destructive"
                   >
-                    <Trash2 className="h-3.5 w-3.5" /> Delete
+                    <Trash2 className="mr-1 h-3.5 w-3.5" />
+                    Delete
                   </Button>
                 </div>
               </div>
+            </CardContent>
+          </Card>
+        ))}
 
-            </div>
-          ))}
-
-          {roles.length === 0 && (
-            <p className="text-xs text-muted-foreground italic text-center py-10">
-              No configuration roles found within this clinic ledger. Use the "Create New Role" trigger strip above.
-            </p>
-          )}
-        </CardContent>
-      </Card>
-
+        {roles.length === 0 && (
+          <p className="rounded-lg border border-dashed bg-card/30 py-6 text-center text-xs italic text-muted-foreground">
+            No blueprints discovered. Use the button above to create a role.
+          </p>
+        )}
+      </div>
     </div>
   );
 }
