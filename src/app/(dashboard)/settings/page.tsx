@@ -1,135 +1,172 @@
+// src/app/(dashboard)/settings/page.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { toast } from  "sonner";
-import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
+import { Loader2, Users, ShieldAlert, Layers } from "lucide-react";
 import { getOrganizationMembersAction, updateMemberAccessAction } from "@/lib/actions/access-settings.actions";
-import { ShieldAlert, Loader2, Users } from "lucide-react";
+import { getRolesAction, syncUserAccessAction } from "@/lib/actions/role.actions";
+import { getDepartmentsAction } from "@/lib/actions/department.actions";
 import { SIDEBAR_TABS } from "@/constants/sidebar-tabs";
-
-interface UserProfile {
-  _id: string;
-  clerkId: string;
-  email: string;
-  firstName?: string;
-  lastName?: string;
-  visibleTabs: string[];
-  role?: string;
-}
-
-
+import { MemberAccessCard } from "@/feature/settings/components/member-access-card";
+import { RoleConfigPanel } from "@/feature/settings/components/role-config-panel";
 
 export default function AccessSettingsPage() {
-  const [members, setMembers] = useState<UserProfile[]>([]);
+  const [members, setMembers] = useState<any[]>([]);
+  const [roles, setRoles] = useState<any[]>([]);
+  const [departments, setDepartments] = useState<any[]>([]);
+  
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
-  
-  const [selectedMember, setSelectedMember] = useState<UserProfile | null>(null);
-  const [selectedTabs, setSelectedTabs] = useState<string[]>([]);
+  const [selectedMember, setSelectedMember] = useState<any | null>(null);
+
+  // Re-sync master structural assets from database context safely
+  const refreshControlData = async () => {
+    try {
+      const token = localStorage.getItem("clinic_jwt") || "";
+      const [membersRes, rolesRes, deptsRes] = await Promise.all([
+        getOrganizationMembersAction(token),
+        getRolesAction(token),
+        getDepartmentsAction(token)
+      ]);
+
+      if (membersRes.success && membersRes.data) setMembers(membersRes.data);
+      if (rolesRes.success && rolesRes.data) setRoles(rolesRes.data);
+      if (deptsRes.success && deptsRes.data) setDepartments(deptsRes.data);
+    } catch (err) {
+      toast.error("Internal workspace hydration refresh error.");
+    }
+  };
 
   useEffect(() => {
-    async function loadTeamProfiles() {
+    async function hydrateWorkspaceConfiguration() {
       try {
-        const token = localStorage.getItem("clinic_jwt") || "";
-        const res = await getOrganizationMembersAction(token);
-        if (res.success && res.data) {
-          setMembers(res.data);
-        } else {
-          toast.error(res.error || "Failed to load team directory.");
-        }
-      } catch (err) {
-        toast.error("Internal connection routing exception.");
+        await refreshControlData();
       } finally {
         setIsLoading(false);
       }
     }
-    loadTeamProfiles();
+    hydrateWorkspaceConfiguration();
   }, []);
 
-  const handleSelectMember = (member: UserProfile) => {
-    setSelectedMember(member);
-    setSelectedTabs(member.visibleTabs || []);
-  };
 
-  const handleToggleTab = (tabId: string) => {
-    setSelectedTabs(prev => 
-      prev.includes(tabId) ? prev.filter(t => t !== tabId) : [...prev, tabId]
-    );
-  };
+const handleUpdateMemberAccess = async (payload: any) => {
+  try {
+    setIsUpdating(true);
+    const token = localStorage.getItem("clinic_jwt") || "";
+    const res = await syncUserAccessAction(token, payload);
 
-  const handleCommitAccessMatrix = async () => {
-    if (!selectedMember) return;
-    try {
-      setIsUpdating(true);
-      const token = localStorage.getItem("clinic_jwt") || "";
-      const res = await updateMemberAccessAction(token, {
-        userId: selectedMember._id,
-        visibleTabs: selectedTabs,
-      });
-
-      if (res.success && res.data) {
-        setMembers(prev => prev.map(m => m._id === selectedMember._id ? { ...m, ...res.data } : m));
-        toast.success(`Access permissions updated successfully.`);
-        setSelectedMember(null);
-      } else {
-        toast.error(res.error || "Failed to modify structural properties.");
-      }
-    } catch {
-      toast.error("Network synchronization exception occurred.");
-    } finally {
-      setIsUpdating(false);
+    if (res.success && res.data) {
+      // 1. Wipe the local storage permission caches immediately
+      localStorage.removeItem("clinic_allowed_tabs");
+      
+      // 2. Update local state
+      setMembers(prev => prev.map(m => m._id === payload.userId ? res.data : m));
+      toast.success("Security workspace configuration profiles aligned.");
+      setSelectedMember(null);
+      
+      // 3. Force browser-level validation refresh
+      window.location.reload(); 
+    } else {
+      toast.error(res.error || "Failed to parse access structure changes.");
     }
-  };
+  } catch {
+    toast.error("Network communication pipeline validation error.");
+  } finally {
+    setIsUpdating(false);
+  }
+};
 
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[50vh] gap-2">
         <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
-        <p className="text-sm text-muted-foreground font-medium">Hydrating user roles matrix...</p>
+        <p className="text-sm text-muted-foreground font-medium">Hydrating operations configuration grid...</p>
       </div>
     );
   }
 
   return (
-    <div className="w-full space-y-10 text-foreground antialiased pb-12 max-w-5xl mx-auto">
+    <div className="w-full space-y-12 text-foreground antialiased pb-12 max-w-5xl mx-auto">
+      
+      {/* MODULE 1: GLOBAL CLINIC ROLE BLUEPRINTS POPUP DESIGNER */}
+      <section className="space-y-4">
+        <div className="space-y-1">
+          <h2 className="text-base font-bold uppercase tracking-wider text-primary flex items-center gap-2 border-b pb-2">
+            <Layers className="h-5 w-5" /> Clinic Base Role Configurations
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            Construct and manage custom security role archetypes. Click on the action button below to trigger the creation view popup.
+          </p>
+        </div>
+        
+        {/* On operations state modifications, force dynamic structural matrix alignment refreshes */}
+        <div onBlur={refreshControlData}>
+          <RoleConfigPanel />
+        </div>
+      </section>
+
+      {/* MODULE 2: MEMBER DIRECTORY WORKSPACE ROSTER LIST */}
       <section className="space-y-4">
         <div className="space-y-1">
           <h2 className="text-base font-bold uppercase tracking-wider text-emerald-600 flex items-center gap-2 border-b pb-2">
-            <Users className="h-5 w-5" /> Team Access Workspace
+            <Users className="h-5 w-5" /> Team Clearances Roster
           </h2>
           <p className="text-sm text-muted-foreground">
-            Manage operational team profiles and control layout navigation module filters directly.
+            Select an employee below to expand their advanced account access workspace card, modify assigned blueprint scopes, or configure custom overrides.
           </p>
         </div>
 
-        <div className="w-full divide-y border rounded-lg bg-background overflow-hidden">
+        <div className="w-full divide-y border rounded-lg bg-background overflow-hidden shadow-2xs">
           {members.map((member) => {
             const hasName = member.firstName || member.lastName;
             const displayName = hasName 
               ? `${member.firstName || ""} ${member.lastName || ""}`.trim() 
               : member.email.split("@")[0];
+            
+            const isTargeted = selectedMember?._id === member._id;
+
+            // Gather and match reference keys cleanly
+            const directOverrideTabStrings = member.visibleTabs || [];
+            
+            // Re-resolve populated roles references to get explicit tag badges row display metrics
+            const userRoleObjects = (member.roleIds || []).map((id: any) => {
+              const matchedId = typeof id === 'object' && id?._id ? id._id.toString() : id.toString();
+              return roles.find(r => r._id === matchedId);
+            }).filter(Boolean);
+
+            const inheritedTabStrings = userRoleObjects.flatMap((r: any) => r.allowedTabs || []);
+            const unifiedPreviewTabs = Array.from(new Set([...directOverrideTabStrings, ...inheritedTabStrings]));
 
             return (
               <div 
                 key={member._id}
-                onClick={() => handleSelectMember(member)}
-                className="flex flex-col sm:flex-row sm:items-center justify-between p-4 transition-colors gap-3 cursor-pointer hover:bg-muted/40"
+                onClick={() => setSelectedMember(member)}
+                className={`flex flex-col sm:flex-row sm:items-center justify-between p-4 transition-colors gap-3 cursor-pointer ${
+                  isTargeted ? "bg-emerald-50/40 dark:bg-emerald-950/20 font-medium" : "hover:bg-muted/40"
+                }`}
               >
                 <div className="space-y-0.5">
                   <span className="text-sm font-semibold flex items-center gap-2">
                     {displayName}
-                    <Badge variant="secondary" className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0 bg-emerald-50 text-emerald-700 border-emerald-200">
-                      Member
+                    <Badge variant="secondary" className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0 bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-transparent">
+                      {member.accessMode || "strict"}
                     </Badge>
                   </span>
                   <p className="text-xs text-muted-foreground">{member.email}</p>
                 </div>
 
                 <div className="flex flex-wrap gap-1 items-center max-w-md sm:justify-end">
-                  {member.visibleTabs?.map(tabId => {
+                  {/* Print Active Structural Role Blueprint Badges */}
+                  {userRoleObjects.map((role: any) => (
+                    <Badge key={role._id} className="text-[9px] bg-blue-600 hover:bg-blue-600 text-white uppercase font-bold tracking-wide border-none px-2 rounded">
+                      {role.name}
+                    </Badge>
+                  ))}
+                  
+                  {/* Print Final Unified Allowed Side-Navigation Links */}
+                  {unifiedPreviewTabs.map(tabId => {
                     const label = SIDEBAR_TABS.find(t => t.id === tabId)?.label || tabId;
                     return (
                       <Badge key={tabId} variant="outline" className="text-[10px] bg-background">
@@ -137,7 +174,7 @@ export default function AccessSettingsPage() {
                       </Badge>
                     );
                   })}
-                  {(!member.visibleTabs || member.visibleTabs.length === 0) && (
+                  {unifiedPreviewTabs.length === 0 && (
                     <span className="text-xs text-destructive font-medium flex items-center gap-1">
                       <ShieldAlert className="h-3.5 w-3.5" /> Navigation Restricted
                     </span>
@@ -146,57 +183,23 @@ export default function AccessSettingsPage() {
               </div>
             );
           })}
-          {members.length === 0 && (
-            <p className="text-xs text-muted-foreground italic text-center py-8">
-              No organization staff members matched this workspace filter context.
-            </p>
-          )}
         </div>
       </section>
 
+      {/* MODULE 3: DYNAMICALLY EXPANDED ACCESS MANAGEMENT COMPONENT WORKSPACE CARD */}
       {selectedMember && (
-        <section className="space-y-6 pt-6 border-t animate-in fade-in-50 duration-200">
-          <div>
-            <h3 className="text-sm font-bold uppercase tracking-wide text-foreground">
-              Modify Layout Permissions: <span className="text-emerald-600 font-extrabold">{selectedMember.firstName || "User"}</span>
-            </h3>
-            <p className="text-xs text-muted-foreground mt-0.5">Toggle visible side-navigation routes enabled for this profile.</p>
+        <section className="space-y-4 pt-4 border-t border-dashed animate-in slide-in-from-bottom-2 duration-200">
+          <div className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-foreground">
+            <Layers className="h-4 w-4 text-emerald-600" /> Account Clearance Control Center
           </div>
-
-          <div className="grid gap-3">
-            <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground block">Allowed Workspace Layout Sub-modules</Label>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-muted/20 p-4 border rounded-xl">
-              {SIDEBAR_TABS.map((tab) => (
-                <div key={tab.id} className="flex items-center space-x-3 bg-background p-2.5 rounded-lg border border-border/40 shadow-3xs">
-                  <Checkbox 
-                    id={`tab-checkbox-${tab.id}`} 
-                    checked={selectedTabs.includes(tab.id)}
-                    onCheckedChange={() => handleToggleTab(tab.id)}
-                  />
-                  <label 
-                    htmlFor={`tab-checkbox-${tab.id}`}
-                    className="text-xs font-semibold leading-none cursor-pointer flex-1 select-none text-foreground/90"
-                  >
-                    {tab.label}
-                  </label>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-3 pt-2">
-            <Button variant="ghost" size="sm" onClick={() => setSelectedMember(null)} className="h-9 text-xs">
-              Cancel
-            </Button>
-            <Button 
-              size="sm" 
-              onClick={handleCommitAccessMatrix} 
-              disabled={isUpdating} 
-              className="bg-emerald-600 hover:bg-emerald-700 h-9 text-xs font-semibold px-6 shadow-xs"
-            >
-              {isUpdating ? "Syncing Tabs..." : "Authorize Access Matrix"}
-            </Button>
-          </div>
+          <MemberAccessCard
+            member={selectedMember}
+            roles={roles}
+            departments={departments}
+            isSaving={isUpdating}
+            onSave={handleUpdateMemberAccess}
+            onCancel={() => setSelectedMember(null)}
+          />
         </section>
       )}
     </div>

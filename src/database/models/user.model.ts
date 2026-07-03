@@ -12,6 +12,11 @@ export interface IUser {
   authProvider: 'google' | 'credentials';
   departments: Types.ObjectId[];
   visibleTabs: string[];
+  customPermissions: string[];
+  
+  roleIds: Types.ObjectId[]; 
+  departmentIds: Types.ObjectId[];
+  accessMode: "strict" | "shared" | "global";
   createdAt: Date;
   updatedAt: Date;
 }
@@ -36,6 +41,22 @@ const UserSchema = new Schema<IUser>(
     visibleTabs: [
       { type: String, default: ["/", "/patients"] } // Core fallback defaults
     ],
+    customPermissions: [
+      { type: String, default: [] }
+    ],
+    
+    // Multi-role collection pointer matrix targets
+    roleIds: [
+      { type: Schema.Types.ObjectId, ref: "Role", default: [] }
+    ],
+    departmentIds: [
+      { type: Schema.Types.ObjectId, ref: "Department", default: [] }
+    ],
+    accessMode: {
+      type: String,
+      enum: ["strict", "shared", "global"],
+      default: "strict"
+    }
   },
   { timestamps: true }
 );

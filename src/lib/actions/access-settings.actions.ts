@@ -33,7 +33,6 @@ export async function getOrganizationMembersAction(token: string) {
       return { success: false, error: "Forbidden: Administrative access required." };
     }
 
-    // 1. Fetch only memberships belonging to this orgId where role is 'org:member'
     const memberRecords = await Membership.find({
       orgId: authContext.orgId,
       role: "org:member"
@@ -43,10 +42,9 @@ export async function getOrganizationMembersAction(token: string) {
       return { success: true, data: [] };
     }
 
-    // 2. Extract the user IDs from those memberships
     const userIds = memberRecords.map(m => m.userId);
 
-    // 3. Query the User collection directly to pull their identity details and visible tabs matrix
+    // Hydrate the full privilege fields from MongoDB
     const users = await User.find({
       _id: { $in: userIds }
     }).sort({ firstName: 1 }).lean();
@@ -57,8 +55,12 @@ export async function getOrganizationMembersAction(token: string) {
       email: u.email || "",
       firstName: u.firstName || "",
       lastName: u.lastName || "",
+      role: "org:member",
+      
       visibleTabs: Array.isArray(u.visibleTabs) ? u.visibleTabs : ["/", "/patients"],
-      role: "org:member"
+      roleIds: Array.isArray(u.roleIds) ? u.roleIds.map((id: any) => id.toString()) : [],
+      departmentIds: Array.isArray(u.departmentIds) ? u.departmentIds.map((id: any) => id.toString()) : [],
+      accessMode: u.accessMode || "strict"
     }));
 
     return { success: true, data: structuralMembers };
