@@ -6,6 +6,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { updateStaffAccessControl } from "@/lib/actions/admin.actions";
 import { ShieldCheck } from "lucide-react";
+import { SIDEBAR_TABS } from "@/constants/sidebar-tabs";
 
 interface AccessControlPanelProps {
   doctorId: string;
@@ -19,14 +20,6 @@ const DEPARTMENTS = [
   { id: "dept-3", name: "Dermatology" }
 ];
 
-const SIDEBAR_TABS = [
-  { href: "/", label: "Dashboard" },
-  { href: "/patients", label: "Patients" },
-  { href: "/appointments", label: "Appointments" },
-  { href: "/billing", label: "Billing" },
-  { href: "/forms", label: "Custom Forms" }
-];
-
 export function AccessControlPanel({ doctorId, isSaving, setIsSaving }: AccessControlPanelProps) {
   const [checkedDepts, setCheckedDepts] = useState<string[]>([]);
   const [checkedTabs, setCheckedTabs] = useState<string[]>([]);
@@ -38,7 +31,7 @@ export function AccessControlPanel({ doctorId, isSaving, setIsSaving }: AccessCo
       setCheckedTabs(["/", "/patients"]);
     } else if (doctorId === "doc-102") {
       setCheckedDepts(["dept-2"]);
-      setCheckedTabs(["/", "/patients", "/appointments"]);
+      setCheckedTabs(["/", "/patients", "/forms"]);
     } else {
       setCheckedDepts([]);
       setCheckedTabs(["/", "/patients"]);
@@ -99,13 +92,13 @@ export function AccessControlPanel({ doctorId, isSaving, setIsSaving }: AccessCo
           <span className="text-xs font-bold uppercase tracking-wider text-primary block">Allowed Sidebar Navigation Views</span>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             {SIDEBAR_TABS.map((t) => (
-              <div key={t.href} className="flex items-center space-x-2.5 border rounded-lg p-3 bg-background hover:bg-muted/10 transition-colors">
+              <div key={t.id} className="flex items-center space-x-2.5 border rounded-lg p-3 bg-background hover:bg-muted/10 transition-colors">
                 <Checkbox 
-                  id={t.href} 
-                  checked={checkedTabs.includes(t.href)} 
-                  onCheckedChange={(v) => setCheckedTabs(p => v ? [...p, t.href] : p.filter(x => x !== t.href))} 
+                  id={t.id} 
+                  checked={checkedTabs.includes(t.id)} 
+                  onCheckedChange={(v) => setCheckedTabs(p => v ? [...p, t.id] : p.filter(x => x !== t.id))} 
                 />
-                <label htmlFor={t.href} className="text-sm font-medium leading-none cursor-pointer">{tab.label}</label>
+                <label htmlFor={t.id} className="text-sm font-medium leading-none cursor-pointer">{t.label}</label>
               </div>
             ))}
           </div>

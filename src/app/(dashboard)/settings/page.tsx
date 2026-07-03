@@ -8,6 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { getOrganizationMembersAction, updateMemberAccessAction } from "@/lib/actions/access-settings.actions";
 import { ShieldAlert, Loader2, Users } from "lucide-react";
+import { SIDEBAR_TABS } from "@/constants/sidebar-tabs";
 
 interface UserProfile {
   _id: string;
@@ -19,13 +20,7 @@ interface UserProfile {
   role?: string;
 }
 
-const SIDEBAR_TABS = [
-  { id: "/", label: "Dashboard" },
-  { id: "/patients", label: "Patients" },
-  { id: "/forms", label: "Custom Forms" },
-  { id: "/pharmacy", label: "Pharmacy" },
-  { id: "/clinic-profile", label: "Clinic Profile" },
-];
+
 
 export default function AccessSettingsPage() {
   const [members, setMembers] = useState<UserProfile[]>([]);
