@@ -87,13 +87,7 @@ export default function AccessSettingsPage() {
   return (
     <div className="w-full space-y-6 text-foreground antialiased pb-12 max-w-5xl mx-auto">
       
-      {/* MINIMALIST CONTROL HEADER */}
-      <div className="border-b pb-4 space-y-1">
-        <h1 className="text-2xl font-bold tracking-tight">Access Management</h1>
-        <p className="text-sm text-muted-foreground">
-          Manage employee account clearances, custom operational unit domains, and application security roles.
-        </p>
-      </div>
+      
 
       {/* VIEW DECOUPLING HEADER TOGGLE MATRIX */}
       <div className="flex border-b border-muted">
