@@ -22,11 +22,11 @@ export function PrescriptionPdfPreview({ payload, sections, showPreview }: Presc
   const document = <PrescriptionPdfDocument payload={payload} sections={sections} />;
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3">
+    <div className="flex min-h-0 w-full flex-1 flex-col gap-3">
       <div className="flex items-center justify-end">
         <PDFDownloadLink document={document} fileName={buildFileName(payload)}>
           {({ loading }) => (
-            <Button size="sm" className="h-8 gap-1.5 text-xs" disabled={loading}>
+            <Button size="sm" className="h-9 gap-1.5 text-xs font-semibold shadow-xs" disabled={loading}>
               {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
               Download PDF
             </Button>
@@ -35,8 +35,8 @@ export function PrescriptionPdfPreview({ payload, sections, showPreview }: Presc
       </div>
 
       {showPreview ? (
-        <div className="min-h-[520px] flex-1 overflow-hidden rounded-md border bg-muted">
-          <PDFViewer width="100%" height="100%" showToolbar className="min-h-[520px]">
+        <div className="w-full flex-1 overflow-hidden rounded-xl border bg-stone-100 min-h-[560px]">
+          <PDFViewer width="100%" height="100%" showToolbar style={{ border: "none", width: "100%", height: "100%" }}>
             {document}
           </PDFViewer>
         </div>

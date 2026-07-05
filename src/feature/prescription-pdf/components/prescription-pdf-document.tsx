@@ -2,120 +2,151 @@ import React from "react";
 import { Document, Image, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
 import type { PrescriptionPdfPayload, PrescriptionPdfSections } from "../types";
 
-interface PrescriptionPdfDocumentProps {
-  payload: PrescriptionPdfPayload;
-  sections: PrescriptionPdfSections;
-}
-
 const styles = StyleSheet.create({
   page: {
-    padding: 36,
+    paddingTop: 36,
+    paddingBottom: 36,
+    paddingHorizontal: 44,
     fontFamily: "Helvetica",
-    fontSize: 10,
-    color: "#111827",
-    lineHeight: 1.45,
+    fontSize: 9.5,
+    color: "#000000",
+    lineHeight: 1.4,
   },
-  header: {
+  headerContainer: {
     alignItems: "center",
     textAlign: "center",
-    marginBottom: 12,
+    marginBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: "#e5e7eb",
+    borderBottomStyle: "solid",
+    paddingBottom: 10,
   },
   logo: {
-    width: 54,
-    height: 54,
+    width: 48,
+    height: 48,
     objectFit: "contain",
     marginBottom: 6,
   },
   clinicName: {
-    fontSize: 20,
+    fontSize: 16,
     fontFamily: "Helvetica-Bold",
-    marginBottom: 4,
+    color: "#000000",
+    marginBottom: 3,
   },
-  clinicLine: {
-    fontSize: 8.5,
+  clinicSubText: {
+    fontSize: 9,
     color: "#4b5563",
-    marginBottom: 1.5,
+    marginBottom: 2,
   },
-  breaker: {
-    borderBottomWidth: 1,
-    borderBottomColor: "#111827",
-    borderBottomStyle: "solid",
-    marginVertical: 10,
-  },
-  sectionTitle: {
-    fontSize: 11,
+  groupHeading: {
+    fontSize: 8.5,
     fontFamily: "Helvetica-Bold",
+    color: "#94a3b8",
     textTransform: "uppercase",
+    letterSpacing: 0.5,
     marginBottom: 6,
-    color: "#0f172a",
+    marginTop: 8,
   },
-  grid: {
+  inlineRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
-  },
-  field: {
-    width: "48%",
     marginBottom: 4,
   },
-  label: {
-    fontSize: 7.5,
-    color: "#64748b",
-    textTransform: "uppercase",
-    marginBottom: 1,
-  },
-  value: {
-    fontSize: 10,
-    color: "#111827",
-  },
-  block: {
-    marginBottom: 8,
-  },
-  medicationHeader: {
+  inlineField: {
+    width: "50%",
     flexDirection: "row",
+    marginBottom: 4,
+  },
+  fieldLabel: {
+    color: "#4b5563",
+    width: 90,
+  },
+  fieldValue: {
+    color: "#000000",
+    flex: 1,
+  },
+  metaDividerBar: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    borderTopWidth: 1,
+    borderTopColor: "#f3f4f6",
     borderBottomWidth: 1,
-    borderBottomColor: "#cbd5e1",
+    borderBottomColor: "#f3f4f6",
+    borderTopStyle: "solid",
+    borderBottomStyle: "solid",
+    paddingVertical: 6,
+    marginVertical: 8,
+  },
+  encounterLabel: {
+    color: "#4b5563",
+  },
+  encounterValue: {
+    color: "#000000",
+  },
+  longRow: {
+    flexDirection: "row",
+    marginTop: 6,
+    marginBottom: 2,
+  },
+  longLabel: {
+    color: "#4b5563",
+    width: 110,
+  },
+  longValue: {
+    color: "#000000",
+    flex: 1,
+  },
+  rxHeader: {
+    fontSize: 18,
+    fontFamily: "Helvetica-Bold",
+    color: "#000000",
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  tableHeader: {
+    flexDirection: "row",
+    borderBottomWidth: 1.5,
+    borderBottomColor: "#000000",
     borderBottomStyle: "solid",
     paddingBottom: 4,
-    marginBottom: 4,
-    fontFamily: "Helvetica-Bold",
-    fontSize: 8,
-    color: "#334155",
+    marginBottom: 2,
   },
-  medicationRow: {
+  tableRow: {
     flexDirection: "row",
-    borderBottomWidth: 0.5,
-    borderBottomColor: "#e2e8f0",
+    borderBottomWidth: 1,
+    borderBottomColor: "#f3f4f6",
     borderBottomStyle: "solid",
     paddingVertical: 5,
+    alignItems: "center",
   },
-  medName: {
-    width: "34%",
-    paddingRight: 6,
+  thText: {
+    fontSize: 8.5,
+    fontFamily: "Helvetica-Bold",
+    color: "#4b5563",
+    textTransform: "uppercase",
   },
-  medFrequency: {
-    width: "24%",
-    paddingRight: 6,
+  colMed: { width: "40%" },
+  colFreq: { width: "25%" },
+  colDur: { width: "15%" },
+  colFood: { width: "20%" },
+  medNameText: {
+    fontFamily: "Helvetica",
+    color: "#000000",
   },
-  medDuration: {
-    width: "18%",
-    paddingRight: 6,
-  },
-  medInstructions: {
-    width: "24%",
-  },
-  warning: {
-    color: "#92400e",
-    backgroundColor: "#fffbeb",
-    padding: 8,
-    fontSize: 9,
+  followupContainer: {
+    marginTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: "#e5e7eb",
+    borderTopStyle: "solid",
+    paddingTop: 8,
+    textAlign: "right",
   },
   footer: {
     position: "absolute",
     bottom: 20,
-    left: 36,
-    right: 36,
-    fontSize: 7,
+    left: 44,
+    right: 44,
+    fontSize: 7.5,
     color: "#94a3b8",
     textAlign: "center",
   },
@@ -128,146 +159,151 @@ function formatDate(date?: string) {
   return parsed.toLocaleDateString("en-GB");
 }
 
-function formatInstructions(value?: string) {
-  if (!value) return "";
-
+function parseFoodRelation(inst?: string) {
+  if (!inst) return "---";
   try {
-    const parsed = JSON.parse(value);
-    return [parsed.relationToFood, parsed.globalNotes].filter(Boolean).join("; ");
+    const parsed = JSON.parse(inst);
+    return parsed.relationToFood || "---";
   } catch {
-    return value;
+    return inst || "---";
   }
 }
 
-function Field({ label, value }: { label: string; value?: string }) {
-  if (!value) return null;
-
-  return (
-    <View style={styles.field}>
-      <Text style={styles.label}>{label}</Text>
-      <Text style={styles.value}>{value}</Text>
-    </View>
-  );
+function extractGlobalNotes(medications: any[]) {
+  for (const med of medications) {
+    if (med.instructions) {
+      try {
+        const parsed = JSON.parse(med.instructions);
+        if (parsed.globalNotes) return parsed.globalNotes;
+      } catch {}
+    }
+  }
+  return "";
 }
 
-export function PrescriptionPdfDocument({ payload, sections }: PrescriptionPdfDocumentProps) {
-  const showAnyPatientDetail =
-    sections.patientName ||
-    sections.patientDobAge ||
-    sections.patientGender ||
-    sections.patientPhone ||
-    sections.patientEmail ||
-    sections.patientAddress;
-
-  const showAnyEncounterDetail =
-    sections.encounterDetails ||
-    sections.complaint ||
-    sections.notes ||
-    sections.followupDate ||
-    sections.medications;
+export function PrescriptionPdfDocument({ payload, sections }: { payload: PrescriptionPdfPayload; sections: PrescriptionPdfSections }) {
+  const globalAdvice = extractGlobalNotes(payload.prescription.medications);
 
   return (
     <Document title={`Prescription - ${payload.patient.name}`}>
       <Page size="A4" style={styles.page}>
-        <View style={styles.header}>
+        {/* Centered Branding Header Area */}
+        <View style={styles.headerContainer}>
           {sections.clinicLogo && payload.clinic.logoUrl ? (
-            // React PDF Image has no alt prop; the generated PDF logo is decorative.
-            // eslint-disable-next-line jsx-a11y/alt-text
             <Image src={payload.clinic.logoUrl} style={styles.logo} />
           ) : null}
           {sections.clinicName ? <Text style={styles.clinicName}>{payload.clinic.name}</Text> : null}
-          {sections.clinicAddress && payload.clinic.address ? <Text style={styles.clinicLine}>{payload.clinic.address}</Text> : null}
-          {sections.clinicPhone && payload.clinic.phone ? <Text style={styles.clinicLine}>Phone: {payload.clinic.phone}</Text> : null}
+          {sections.clinicAddress && payload.clinic.address ? <Text style={styles.clinicSubText}>{payload.clinic.address}</Text> : null}
+          {sections.clinicPhone && payload.clinic.phone ? <Text style={styles.clinicSubText}>Phone: {payload.clinic.phone}</Text> : null}
           {sections.clinicTimings && payload.clinic.timings.length > 0 ? (
-            <Text style={styles.clinicLine}>
-              {payload.clinic.timings.map((timing) => `${timing.days}: ${timing.open} - ${timing.close}`).join(" | ")}
+            <Text style={styles.clinicSubText}>
+              {payload.clinic.timings.map((t) => `${t.days}: ${t.open} - ${t.close}`).join(" | ")}
             </Text>
           ) : null}
         </View>
 
-        <View style={styles.breaker} />
-
-        {showAnyPatientDetail ? (
-          <View style={styles.block}>
-            <Text style={styles.sectionTitle}>Patient Details</Text>
-            <View style={styles.grid}>
-              {sections.patientName ? <Field label="Name" value={payload.patient.name} /> : null}
-              {sections.patientDobAge ? (
-                <Field
-                  label="DOB / Age"
-                  value={[formatDate(payload.patient.dob), payload.patient.ageText].filter(Boolean).join(" / ")}
-                />
-              ) : null}
-              {sections.patientGender ? <Field label="Gender" value={payload.patient.gender} /> : null}
-              {sections.patientPhone ? <Field label="Phone" value={payload.patient.phone} /> : null}
-              {sections.patientEmail ? <Field label="Email" value={payload.patient.email} /> : null}
-              {sections.patientAddress ? <Field label="Address" value={payload.patient.address} /> : null}
+        {/* Dynamic Patient Details */}
+        {(sections.patientName || sections.patientDobAge || sections.patientGender) && (
+          <View>
+            <Text style={styles.groupHeading}>Patient Profile Details</Text>
+            <View style={styles.inlineRow}>
+              {sections.patientName && (
+                <View style={styles.inlineField}>
+                  <Text style={styles.fieldLabel}>Patient Name:</Text>
+                  <Text style={styles.fieldValue}>{payload.patient.name}</Text>
+                </View>
+              )}
+              {sections.patientDobAge && (
+                <View style={styles.inlineField}>
+                  <Text style={styles.fieldLabel}>DOB / Age:</Text>
+                  <Text style={styles.fieldValue}>
+                    {[formatDate(payload.patient.dob), payload.patient.ageText].filter(Boolean).join(" / ")}
+                  </Text>
+                </View>
+              )}
+              {sections.patientGender && (
+                <View style={styles.inlineField}>
+                  <Text style={styles.fieldLabel}>Gender Identity:</Text>
+                  <Text style={[styles.fieldValue, { textTransform: "capitalize" }]}>{payload.patient.gender}</Text>
+                </View>
+              )}
+              {sections.patientPhone && payload.patient.phone && (
+                <View style={styles.inlineField}>
+                  <Text style={styles.fieldLabel}>Contact Phone:</Text>
+                  <Text style={styles.fieldValue}>{payload.patient.phone}</Text>
+                </View>
+              )}
             </View>
           </View>
-        ) : null}
+        )}
 
-        <View style={styles.breaker} />
+        {/* Balanced Encounter Header Bar */}
+        {sections.encounterDetails && (
+          <View style={styles.metaDividerBar}>
+            <Text style={styles.encounterLabel}>Encounter Checked: <Text style={styles.encounterValue}>{payload.encounter.date} {payload.encounter.time}</Text></Text>
+            <Text style={styles.encounterLabel}>Consultant Practitioner: <Text style={styles.encounterValue}>{payload.encounter.doctor} ({payload.encounter.specialty})</Text></Text>
+          </View>
+        )}
 
-        {showAnyEncounterDetail ? (
-          <View style={styles.block}>
-            <Text style={styles.sectionTitle}>Prescription</Text>
-
-            {sections.encounterDetails ? (
-              <View style={styles.grid}>
-                <Field label="Encounter" value={`${payload.encounter.date}, ${payload.encounter.time}`} />
-                <Field label="Doctor" value={`${payload.encounter.doctor} (${payload.encounter.specialty})`} />
-              </View>
-            ) : null}
-
-            {sections.complaint && payload.encounter.complaint ? (
-              <View style={styles.block}>
-                <Text style={styles.label}>Complaint / Diagnosis</Text>
-                <Text style={styles.value}>{payload.encounter.complaint}</Text>
-              </View>
-            ) : null}
-
-            {sections.notes && payload.encounter.notes ? (
-              <View style={styles.block}>
-                <Text style={styles.label}>Clinical Notes</Text>
-                <Text style={styles.value}>{payload.encounter.notes}</Text>
-              </View>
-            ) : null}
-
-            {sections.followupDate && payload.encounter.followupDate ? (
-              <View style={styles.block}>
-                <Text style={styles.label}>Follow-up Date</Text>
-                <Text style={styles.value}>{formatDate(payload.encounter.followupDate)}</Text>
-              </View>
-            ) : null}
-
-            {sections.medications ? (
-              payload.prescription.medications.length > 0 ? (
-                <View style={styles.block}>
-                  <View style={styles.medicationHeader}>
-                    <Text style={styles.medName}>Medicine</Text>
-                    <Text style={styles.medFrequency}>Frequency</Text>
-                    <Text style={styles.medDuration}>Duration</Text>
-                    <Text style={styles.medInstructions}>Instructions</Text>
-                  </View>
-                  {payload.prescription.medications.map((medication, index) => (
-                    <View key={`${medication.name}-${index}`} style={styles.medicationRow}>
-                      <Text style={styles.medName}>{medication.name}</Text>
-                      <Text style={styles.medFrequency}>{medication.frequency}</Text>
-                      <Text style={styles.medDuration}>{medication.duration}</Text>
-                      <Text style={styles.medInstructions}>{formatInstructions(medication.instructions)}</Text>
-                    </View>
-                  ))}
-                </View>
-              ) : (
-                <Text style={styles.warning}>No linked prescription medicines were found for this encounter.</Text>
-              )
-            ) : (
-              <Text style={styles.warning}>Medication list omitted by doctor selection. This PDF is an encounter summary.</Text>
-            )}
+        {/* Diagnosis & notes rows */}
+        {sections.complaint && payload.encounter.complaint ? (
+          <View style={styles.longRow}>
+            <Text style={styles.longLabel}>Chief Diagnosis:</Text>
+            <Text style={styles.longValue}>{payload.encounter.complaint}</Text>
           </View>
         ) : null}
 
-        <Text style={styles.footer}>Generated from clinic medical history. PDF file is not stored by this version.</Text>
+        {sections.notes && payload.encounter.notes ? (
+          <View style={styles.longRow}>
+            <Text style={styles.longLabel}>Clinical Notes:</Text>
+            <Text style={styles.longValue}>{payload.encounter.notes}</Text>
+          </View>
+        ) : null}
+
+        {/* Medical prescriptions list */}
+        <View>
+          <Text style={styles.rxHeader}>Rx</Text>
+          {sections.medications && payload.prescription.medications.length > 0 ? (
+            <View>
+              <View style={styles.tableHeader}>
+                <View style={styles.colMed}><Text style={styles.thText}>Medicine Formulation</Text></View>
+                <View style={styles.colFreq}><Text style={styles.thText}>Frequency Routines</Text></View>
+                <View style={styles.colDur}><Text style={styles.thText}>Duration</Text></View>
+                <View style={styles.colFood}><Text style={styles.thText}>Relation to Food</Text></View>
+              </View>
+              {payload.prescription.medications.map((med, idx) => (
+                <View key={idx} style={styles.tableRow}>
+                  <View style={styles.colMed}><Text style={styles.medNameText}>{med.name}</Text></View>
+                  <View style={styles.colFreq}><Text>{med.frequency}</Text></View>
+                  <View style={styles.colDur}><Text>{med.duration}</Text></View>
+                  <View style={styles.colFood}><Text>{parseFoodRelation(med.instructions)}</Text></View>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <View style={{ py: 6, borderStyle: "dashed", borderWidth: 1, borderColor: "#cbd5e1", borderRadius: 4, textAlign: "center" }}>
+              <Text style={{ color: "#94a3b8", fontSize: 8.5 }}>No prescription items selected for this clinical summary sheet.</Text>
+            </View>
+          )}
+        </View>
+
+        {/* Extracted Global Advice Care Routine Section */}
+        {globalAdvice ? (
+          <View style={[styles.longRow, { marginTop: 14, paddingTop: 8, borderTopWidth: 1, borderTopColor: "#f3f4f6", borderTopStyle: "solid" }]}>
+            <Text style={styles.longLabel}>Doctor's Advice:</Text>
+            <Text style={styles.longValue}>{globalAdvice}</Text>
+          </View>
+        ) : null}
+
+        {sections.followupDate && payload.encounter.followupDate ? (
+          <View style={styles.followupContainer}>
+            <Text style={{ color: "#4b5563" }}>
+              Recommended Follow-up Target Timeline: <Text style={{ color: "#000000", fontFamily: "Helvetica-Bold" }}>{formatDate(payload.encounter.followupDate)}</Text>
+            </Text>
+          </View>
+        ) : null}
+
+        <Text style={styles.footer}>Clinic ERP Metadata Document System • Authentic Verification Verified Ledger</Text>
       </Page>
     </Document>
   );

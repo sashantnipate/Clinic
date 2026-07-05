@@ -93,7 +93,11 @@ export function PrescriptionExportDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[94vh] w-[96vw] max-w-6xl flex-col gap-4 overflow-hidden p-5">
+      {/* Forcing explicit layout sizes directly using inline styles to override hardcoded component styles */}
+      <DialogContent 
+        className="flex max-h-[92vh] flex-col gap-4 overflow-hidden p-6"
+        style={{ maxWidth: "1240px", width: "94vw" }}
+      >
         <DialogHeader className="shrink-0 border-b pb-3">
           <DialogTitle className="flex items-center gap-2 text-base font-bold">
             <FileText className="h-4 w-4 text-primary" />
@@ -105,17 +109,17 @@ export function PrescriptionExportDialog({
         </DialogHeader>
 
         {isLoading ? (
-          <div className="flex min-h-[520px] flex-col items-center justify-center gap-2">
+          <div className="flex min-h-[550px] flex-col items-center justify-center gap-2">
             <Loader2 className="h-6 w-6 animate-spin text-primary" />
             <p className="text-xs font-medium text-muted-foreground">Preparing clinic, patient, and prescription data...</p>
           </div>
         ) : payload && sections ? (
-          <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
-            <div className="min-h-0 rounded-md border bg-background">
-              <div className="flex items-center justify-between border-b p-3">
+          <div className="grid min-h-0 flex-1 grid-cols-1 gap-6 lg:grid-cols-[340px_1fr]">
+            <div className="flex min-h-0 flex-col rounded-xl border bg-card shadow-3xs">
+              <div className="flex items-center justify-between border-b p-4 bg-muted/20">
                 <div>
-                  <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Sections</p>
-                  <p className="text-[11px] text-muted-foreground">Unavailable fields are disabled.</p>
+                  <p className="text-xs font-bold uppercase tracking-wide text-foreground">Visible Fields</p>
+                  <p className="text-[11px] text-muted-foreground">Omitted fields are disabled</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <Label htmlFor="pdf-preview-switch" className="text-[11px] font-medium text-muted-foreground">
@@ -125,48 +129,50 @@ export function PrescriptionExportDialog({
                 </div>
               </div>
 
-              <ScrollArea className="h-[560px]">
-                <div className="space-y-4 p-3">
+              <ScrollArea className="flex-1 h-[520px]">
+                <div className="space-y-5 p-4">
                   {prescriptionPdfSectionGroups.map((group) => (
-                    <div key={group.title} className="space-y-2">
-                      <p className="text-[11px] font-bold uppercase tracking-wide text-foreground">{group.title}</p>
+                    <div key={group.title} className="space-y-2.5">
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{group.title}</p>
                       <div className="space-y-2">
                         {group.keys.map((key) => {
                           const disabled = unavailableSections.has(key);
                           return (
                             <label
                               key={key}
-                              className="flex min-h-8 items-center gap-2 rounded-md border px-2 py-1.5 text-xs transition-colors has-disabled:opacity-50"
+                              className="flex min-h-8 items-center gap-3 rounded-lg border bg-background px-3 py-2 text-xs transition-colors hover:bg-muted/30 cursor-pointer has-disabled:opacity-40 has-disabled:cursor-not-allowed"
                             >
                               <Checkbox
                                 checked={sections[key]}
                                 disabled={disabled}
                                 onCheckedChange={(checked) => updateSection(key, checked === true)}
                               />
-                              <span className="font-medium">{prescriptionPdfSectionLabels[key]}</span>
+                              <span className="font-medium text-foreground/90">{prescriptionPdfSectionLabels[key]}</span>
                             </label>
                           );
                         })}
                       </div>
-                      <Separator />
+                      <Separator className="mt-4" />
                     </div>
                   ))}
 
-                  {!sections.medications ? (
-                    <div className="flex gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
-                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                      <p>Medication list is deselected. The generated PDF will read as an encounter summary.</p>
+                  {!sections.medications && (
+                    <div className="flex gap-2 rounded-lg border border-amber-200 bg-amber-50/50 p-3 text-xs text-amber-900 animate-in fade-in-50 duration-200">
+                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                      <p className="leading-normal">Medication list is unselected. The document will export explicitly as a medical encounter clinical summary case file.</p>
                     </div>
-                  ) : null}
+                  )}
                 </div>
               </ScrollArea>
             </div>
 
-            <PrescriptionPdfPreview payload={payload} sections={sections} showPreview={showPreview} />
+            <div className="flex min-h-0 flex-1 flex-col">
+              <PrescriptionPdfPreview payload={payload} sections={sections} showPreview={showPreview} />
+            </div>
           </div>
         ) : (
-          <div className="flex min-h-[520px] items-center justify-center rounded-md border border-dashed text-xs font-medium text-muted-foreground">
-            Select an encounter to prepare a prescription PDF.
+          <div className="flex min-h-[550px] items-center justify-center rounded-xl border border-dashed text-xs font-medium text-muted-foreground">
+            Select an encounter node trajectory sequence block to mount prescription schemas.
           </div>
         )}
       </DialogContent>

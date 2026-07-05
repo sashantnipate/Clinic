@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useUser } from "@clerk/nextjs";
-import { createClinicalEncounterAction, getPatientClinicalTimeline } from "@/lib/actions/medical-history.actions";
+import { createClinicalEncounterAction } from "@/lib/actions/medical-history.actions";
 import { getDepartmentsAction } from "@/lib/actions/department.actions";
 import { getPharmacyItems } from "@/lib/actions/pharmacy.actions";
 import { toast } from "sonner";
@@ -68,15 +68,15 @@ export function useLogEncounter({
           setPharmacyInventory(pharmacyRes.items);
         }
       } catch (err) {
-        console.error("Failed to extract active clinic dependencies:", err);
+        console.error(err);
       }
     }
     if (open) fetchClinicData();
   }, [open]);
 
   const doctorName = useMemo(() => {
-    if (!user) return "Fetching active session...";
-    return `Dr. ${user.firstName || ""} ${user.lastName || ""}`.trim();
+    if (!user) return "Active Session Tracking...";
+    return `${user.firstName || ""} ${user.lastName || ""}`.trim();
   }, [user]);
 
   const parentNode = useMemo(() => {
@@ -87,7 +87,7 @@ export function useLogEncounter({
     if (open) {
       setComplaint("");
       setNotes("");
-      setMedications([{ name: "", dosageQuantity: "1", timingInterval: "2 times a day", relationToFood: "After Food" }]);
+      setMedications([{ name: "", dosageQuantity: "", timingInterval: "2 times a day", relationToFood: "" }]);
       setGlobalInstructions("");
       setCourseDays("");
       setFollowupDate("");
@@ -105,7 +105,7 @@ export function useLogEncounter({
   }, [open, initialType, selectedParentId, parentNode, initialSpecialty]);
 
   const handleAddExcelRow = () => {
-    setMedications([...medications, { name: "", dosageQuantity: "1", timingInterval: "2 times a day", relationToFood: "After Food" }]);
+    setMedications([...medications, { name: "", dosageQuantity: "", timingInterval: "2 times a day", relationToFood: "" }]);
   };
 
   const handleRemoveExcelRow = (index: number) => {
@@ -124,16 +124,16 @@ export function useLogEncounter({
       .filter(m => m.name.trim() !== "")
       .map(m => ({
         name: m.name.trim(),
-        frequency: `${m.timingInterval} (${m.dosageQuantity} Tab)`,
+        frequency: m.dosageQuantity ? `${m.timingInterval} (${m.dosageQuantity})` : m.timingInterval,
         duration: courseDays ? `${courseDays} Days` : "As directed",
         instructions: JSON.stringify({
-          relationToFood: m.relationToFood,
+          relationToFood: m.relationToFood || undefined,
           globalNotes: globalInstructions.trim() || undefined
         })
       }));
 
     if (compiledPrescriptions.length === 0) {
-      toast.error("You must prescribe at least one valid medication formulation.");
+      toast.error("Prescription formulation payload requires at least one entry.");
       return;
     }
 
@@ -169,16 +169,15 @@ export function useLogEncounter({
       });
 
       if (res.success) {
-        toast.success("Encounter record logged successfully.");
+        toast.success("Encounter tracked successfully.");
         onOpenChange(false);
         router.refresh();
         onSuccess();
       } else {
-        toast.error(res.error || "Failed to commit record updates.");
+        toast.error(res.error || "Failed to persist ledger blocks.");
       }
-    } catch (err) {
-      console.error(err);
-      toast.error("Network write pipeline exception encountered.");
+    } catch {
+      toast.error("Internal write exception encountered.");
     } finally {
       setIsSaving(false);
     }
