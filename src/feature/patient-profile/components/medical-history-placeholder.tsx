@@ -4,12 +4,14 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
-import { Maximize2, Minimize2, GitBranchPlus, Loader2, Plus, User, FileText, CalendarRange } from "lucide-react";
+import { Maximize2, Minimize2, GitBranchPlus, Loader2, Plus, User, FileText, CalendarRange, FileDown } from "lucide-react";
 import { getPatientClinicalTimeline } from "@/lib/actions/medical-history.actions";
 import { LogEncounterModal } from "./log-encounter-modal";
+import { PrescriptionExportDialog } from "@/feature/prescription-pdf/components/prescription-export-dialog";
 import { toast } from "sonner";
 
 interface TimelineNode {
+  _id?: string;
   id: string;
   nodeId: string;
   date: string;
@@ -43,6 +45,8 @@ export function MedicalHistoryPlaceholder() {
   const [isLoading, setIsLoading] = useState(true);
 
   const [selectedParentId, setSelectedParentId] = useState<string>("");
+  const [selectedExportEncounterId, setSelectedExportEncounterId] = useState<string>("");
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [initialSpecialty, setInitialSpecialty] = useState("General");
   const [initialType, setInitialType] = useState<TimelineNode["type"]>("one-time");
 
@@ -81,6 +85,17 @@ export function MedicalHistoryPlaceholder() {
     setModalOpen(true);
   };
 
+  const handleExportPrescription = (node: TimelineNode) => {
+    const encounterId = node._id || node.id;
+    if (!encounterId) {
+      toast.error("Encounter ID missing. Could not prepare PDF export.");
+      return;
+    }
+
+    setSelectedExportEncounterId(encounterId);
+    setExportDialogOpen(true);
+  };
+
   const calculatePaths = useCallback(() => {
     if (!contentRef.current || timeline.length === 0) return;
     const contentRect = contentRef.current.getBoundingClientRect();
@@ -106,7 +121,7 @@ export function MedicalHistoryPlaceholder() {
         if (y < minY) minY = y;
         if (y > maxY) maxY = y;
       }
-      
+
       const metaEl = metadataRefs.current[node.nodeId];
       if (metaEl) {
         const metaRect = metaEl.getBoundingClientRect();
@@ -158,7 +173,7 @@ export function MedicalHistoryPlaceholder() {
             to: { x: centerTrunkX, y: childCoord.y },
             isMerge: true
           });
-          laneLastNodeId[node.lane] = ""; 
+          laneLastNodeId[node.lane] = "";
         } else {
           laneLastNodeId[node.lane] = node.nodeId;
         }
@@ -210,16 +225,16 @@ export function MedicalHistoryPlaceholder() {
 
   return (
     <div ref={panelRef} className={`w-full text-foreground antialiased flex flex-col ${isFullscreen ? "bg-background p-6 h-screen w-screen fixed inset-0 z-50" : "h-[calc(100vh-240px)] relative"} space-y-4`}>
-      
+
       <div className="flex flex-row items-center justify-between border-b pb-3 shrink-0 bg-background relative z-20">
         <div>
           <h3 className="text-sm font-semibold tracking-wide text-primary uppercase">Clinical Timeline</h3>
           <p className="text-xs text-muted-foreground mt-0.5">Click side-branch nodes to trigger secondary timeline offshoots.</p>
         </div>
-        
+
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={toggleFullscreen} className="h-8 text-xs gap-1.5">
-            {isFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />} 
+            {isFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
             {isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
           </Button>
 
@@ -236,18 +251,18 @@ export function MedicalHistoryPlaceholder() {
 
       <div className="w-full overflow-y-auto pr-2 flex-1 min-h-0 border rounded-xl bg-card/30 relative z-10" onScroll={calculatePaths}>
         <div ref={contentRef} className="relative w-full max-w-3xl mx-auto py-8 min-h-full">
-          
+
           {timeline.length > 0 && (
             <svg className="absolute inset-0 w-full h-full pointer-events-none z-0 overflow-visible">
               {connections.map((line, idx) => {
-                let strokeColor = "#cbd5e1"; 
+                let strokeColor = "#cbd5e1";
                 let strokeWidth = "2";
-                
+
                 if (line.isTrunk) {
-                  strokeColor = "#22c55e"; 
+                  strokeColor = "#22c55e";
                   strokeWidth = "3";
                 } else if (line.isStart || line.isMerge) {
-                  strokeColor = "#3b82f6"; 
+                  strokeColor = "#3b82f6";
                 }
 
                 return (
@@ -262,9 +277,9 @@ export function MedicalHistoryPlaceholder() {
                   />
                 );
               })}
-              
+
               {horizontalLines.map((line, idx) => (
-                <line 
+                <line
                   key={`horiz-hint-${idx}`}
                   x1={line.x1} y1={line.y1} x2={line.x2} y2={line.y2}
                   stroke="#cbd5e1"
@@ -284,18 +299,18 @@ export function MedicalHistoryPlaceholder() {
               return (
                 <div key={node.nodeId} className="grid grid-cols-12 items-center relative min-h-[28px]">
                   <div className="col-span-4 flex justify-center">
-                    {isLeft && <div ref={(el) => { nodeRefs.current[node.nodeId] = el; }}><TimelineNodeDot node={node} onBranchClick={handleBranchFromNode} /></div>}
+                    {isLeft && <div ref={(el) => { nodeRefs.current[node.nodeId] = el; }}><TimelineNodeDot node={node} onBranchClick={handleBranchFromNode} onExportClick={handleExportPrescription} /></div>}
                   </div>
 
                   <div className="col-span-4 flex justify-center">
-                    {!isLeft && !isRight && <div ref={(el) => { nodeRefs.current[node.nodeId] = el; }}><TimelineNodeDot node={node} onBranchClick={handleBranchFromNode} /></div>}
+                    {!isLeft && !isRight && <div ref={(el) => { nodeRefs.current[node.nodeId] = el; }}><TimelineNodeDot node={node} onBranchClick={handleBranchFromNode} onExportClick={handleExportPrescription} /></div>}
                   </div>
 
                   <div className="col-span-4 flex justify-center">
-                    {isRight && <div ref={(el) => { nodeRefs.current[node.nodeId] = el; }}><TimelineNodeDot node={node} onBranchClick={handleBranchFromNode} /></div>}
+                    {isRight && <div ref={(el) => { nodeRefs.current[node.nodeId] = el; }}><TimelineNodeDot node={node} onBranchClick={handleBranchFromNode} onExportClick={handleExportPrescription} /></div>}
                   </div>
 
-                  <div 
+                  <div
                     ref={(el) => { metadataRefs.current[node.nodeId] = el; }}
                     className="absolute right-4 hidden md:flex flex-col text-right text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80 select-none bg-background px-2 py-0.5 rounded shadow-3xs border border-muted/50 z-10"
                   >
@@ -324,21 +339,36 @@ export function MedicalHistoryPlaceholder() {
         onSuccess={loadTimelineRecords}
         containerRef={panelRef.current}
       />
+
+      <PrescriptionExportDialog
+        open={exportDialogOpen}
+        onOpenChange={setExportDialogOpen}
+        patientId={patientId}
+        encounterId={selectedExportEncounterId}
+      />
     </div>
   );
 }
 
-function TimelineNodeDot({ node, onBranchClick }: { node: TimelineNode; onBranchClick: (node: TimelineNode) => void }) {
+function TimelineNodeDot({
+  node,
+  onBranchClick,
+  onExportClick,
+}: {
+  node: TimelineNode;
+  onBranchClick: (node: TimelineNode) => void;
+  onExportClick: (node: TimelineNode) => void;
+}) {
   const ringColor = node.lane === "center-trunk" ? "ring-green-500/30 border-green-500 text-green-500" :
-                    node.lane === "left-branch" ? "ring-blue-500/20 border-blue-500 text-blue-500" :
-                    "ring-orange-500/20 border-orange-500 text-orange-500";
+    node.lane === "left-branch" ? "ring-blue-500/20 border-blue-500 text-blue-500" :
+      "ring-orange-500/20 border-orange-500 text-orange-500";
 
   return (
     <HoverCard openDelay={50} closeDelay={150}>
       <HoverCardTrigger asChild>
         <div className={`h-4 w-4 rounded-full bg-background border-2 ring-4 flex items-center justify-center cursor-pointer transition-transform hover:scale-125 z-10 ${ringColor}`} />
       </HoverCardTrigger>
-      
+
       <HoverCardContent className="w-72 p-4 space-y-4 shadow-xl z-50 bg-popover text-popover-foreground rounded-xl border-muted/60" align="center" side="top">
         <div className="space-y-1 border-b pb-2">
           <div className="flex items-center justify-between">
@@ -347,28 +377,28 @@ function TimelineNodeDot({ node, onBranchClick }: { node: TimelineNode; onBranch
             </span>
             <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">{node.date}</span>
           </div>
-          
+
           {node.branchName && (
             <div className="text-[10px] font-medium text-blue-600 dark:text-blue-400 bg-blue-500/5 dark:bg-blue-400/5 px-2 py-0.5 rounded border border-blue-200/40 inline-block truncate max-w-full mt-1">
               Track: {node.branchName}
             </div>
           )}
-          
+
           <h4 className="text-sm font-bold tracking-tight text-foreground pt-1">{node.complaint || "Routine Evaluation Check"}</h4>
-          
+
           {node.followupDate && (
             <div className="text-[10px] flex items-center gap-1 font-semibold text-emerald-600 pt-0.5">
               <CalendarRange className="h-3 w-3" /> Scheduled Followup: {new Date(node.followupDate).toLocaleDateString("en-GB")}
             </div>
           )}
         </div>
-        
+
         <div className="text-xs space-y-2">
           <div className="flex items-center gap-2">
-            <User className="h-4 w-4 text-primary shrink-0" /> 
+            <User className="h-4 w-4 text-primary shrink-0" />
             <span className="font-medium text-foreground">{node.doctor} <span className="text-muted-foreground font-normal">({node.specialty})</span></span>
           </div>
-          
+
           {node.notes && (
             <div className="flex items-start gap-2 pt-1 border-t border-dashed">
               <FileText className="h-4 w-4 text-primary shrink-0 mt-0.5" />
@@ -380,18 +410,22 @@ function TimelineNodeDot({ node, onBranchClick }: { node: TimelineNode; onBranch
           )}
         </div>
 
-        {/* Core conditional strict branch filter parameter constraint layout block */}
-        {node.type !== "merge" && node.lane !== "center-trunk" ? (
-          <div className="pt-2">
+        <div className="space-y-2 pt-2">
+          <Button size="sm" variant="outline" className="w-full h-8 text-xs font-semibold gap-1.5" onClick={() => onExportClick(node)}>
+            <FileDown className="h-3.5 w-3.5" /> Export Prescription PDF
+          </Button>
+
+          {/* Core conditional strict branch filter parameter constraint layout block */}
+          {node.type !== "merge" && node.lane !== "center-trunk" ? (
             <Button size="sm" variant="secondary" className="w-full h-8 text-xs font-semibold gap-1.5" onClick={() => onBranchClick(node)}>
               <GitBranchPlus className="h-3.5 w-3.5" /> Log Follow-up Here
             </Button>
-          </div>
-        ) : (
-          <div className="pt-2 text-center text-[10px] font-medium text-muted-foreground bg-muted/40 py-1.5 rounded-lg border border-dashed select-none">
-            {node.type === "merge" ? "Treatment Closed (Merged)" : "Trunk consultation event - followup restricted"}
-          </div>
-        )}
+          ) : (
+            <div className="text-center text-[10px] font-medium text-muted-foreground bg-muted/40 py-1.5 rounded-lg border border-dashed select-none">
+              {node.type === "merge" ? "Treatment Closed (Merged)" : "Trunk consultation event - followup restricted"}
+            </div>
+          )}
+        </div>
       </HoverCardContent>
     </HoverCard>
   );

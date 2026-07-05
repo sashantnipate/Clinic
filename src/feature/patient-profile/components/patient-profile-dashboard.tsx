@@ -23,7 +23,7 @@ export function PatientProfileDashboard({ patient, ageText }: PatientProfileDash
 
   return (
     <div className="w-full space-y-6 text-foreground antialiased">
-      
+
       {/* 1. Minimalist Profile Header */}
       <div className="flex flex-row items-center justify-between border-b pb-4">
         <div className="space-y-1">
@@ -39,24 +39,24 @@ export function PatientProfileDashboard({ patient, ageText }: PatientProfileDash
 
       {/* 2. Simplified Action Button Matrix Row */}
       <div className="flex flex-wrap gap-2">
-        <Button 
-          variant={activeTab === "details" ? "default" : "outline"} 
+        <Button
+          variant={activeTab === "details" ? "default" : "outline"}
           size="sm"
           onClick={() => setActiveTab("details")}
           className="h-9"
         >
           <User className="mr-2 h-4 w-4" /> Details
         </Button>
-        <Button 
-          variant={activeTab === "history" ? "default" : "outline"} 
+        <Button
+          variant={activeTab === "history" ? "default" : "outline"}
           size="sm"
           onClick={() => setActiveTab("history")}
           className="h-9"
         >
           <FileClock className="mr-2 h-4 w-4" /> Medical History
         </Button>
-        <Button 
-          variant={activeTab === "share" ? "default" : "outline"} 
+        <Button
+          variant={activeTab === "share" ? "default" : "outline"}
           size="sm"
           onClick={() => setActiveTab("share")}
           className="h-9"
