@@ -5,6 +5,25 @@ import { MedicalEncounter, Prescription } from "@/database/models/medical-histor
 import { verifyJWTString } from "./auth.actions";
 import mongoose from "mongoose";
 
+interface LogEncounterParams {
+  patientId: string;
+  doctor?: string;
+  specialty?: string;
+  complaint?: string; 
+  notes?: string;     
+  type: "one-time" | "followup" | "merge";
+  lane: "center-trunk" | "left-branch" | "right-branch";
+  branchName?: string;
+  followupDate?: string;
+  parents: string[];
+  prescriptionRx?: Array<{
+    name: string;
+    frequency: string;
+    duration: string;
+    instructions?: string;
+  }>;
+}
+
 export async function getPatientClinicalTimeline(token: string, patientId: string) {
   try {
     const session = await verifyJWTString(token);
@@ -23,24 +42,6 @@ export async function getPatientClinicalTimeline(token: string, patientId: strin
   }
 }
 
-interface LogEncounterParams {
-  patientId: string;
-  doctor: string;
-  specialty: string;
-  complaint: string;
-  notes: string;
-  type: "one-time" | "followup" | "merge";
-  lane: "center-trunk" | "left-branch" | "right-branch";
-  parents: string[];
-  prescriptionRx?: Array<{
-    name: string;
-    dosage: string;
-    frequency: string;
-    duration: string;
-    instructions?: string;
-  }>;
-}
-
 export async function createClinicalEncounterAction(token: string, params: LogEncounterParams) {
   try {
     const session = await verifyJWTString(token);
@@ -55,21 +56,22 @@ export async function createClinicalEncounterAction(token: string, params: LogEn
       nodeId: `n-${Math.random().toString(36).substring(2, 9)}`,
       date: now.toLocaleDateString("en-GB"),
       time: now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
-      doctor: params.doctor,
-      specialty: params.specialty,
-      complaint: params.complaint,
-      notes: params.notes,
+      doctor: params.doctor || "Unknown Doctor",
+      specialty: params.specialty || "General",
+      complaint: params.complaint?.trim() || "", 
+      notes: params.notes?.trim() || "",        
       type: params.type,
       lane: params.lane,
+      branchName: params.branchName?.trim() || undefined,
+      followupDate: params.type === "followup" ? params.followupDate : undefined,
       parents: params.parents
     });
 
-    // If medications are logged inside this modal, insert the script context automatically
     if (params.prescriptionRx && params.prescriptionRx.length > 0) {
       await Prescription.create({
         patientId: new mongoose.Types.ObjectId(params.patientId),
         encounterId: newEncounter._id,
-        prescribedBy: params.doctor,
+        prescribedBy: params.doctor || "Unknown Doctor",
         medications: params.prescriptionRx,
         status: "active"
       });
@@ -77,6 +79,7 @@ export async function createClinicalEncounterAction(token: string, params: LogEn
 
     return { success: true, data: JSON.parse(JSON.stringify(newEncounter)) };
   } catch (error: any) {
+    console.error("Encounter write mutation trace failure:", error);
     return { success: false, error: error.message };
   }
 }

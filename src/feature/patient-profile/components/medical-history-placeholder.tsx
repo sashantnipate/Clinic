@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
-import { Maximize2, Minimize2, GitBranchPlus, Loader2, Plus, User, FileText } from "lucide-react";
+import { Maximize2, Minimize2, GitBranchPlus, Loader2, Plus, User, FileText, CalendarRange } from "lucide-react";
 import { getPatientClinicalTimeline } from "@/lib/actions/medical-history.actions";
 import { LogEncounterModal } from "./log-encounter-modal";
 import { toast } from "sonner";
@@ -18,8 +18,10 @@ interface TimelineNode {
   specialty: string;
   complaint: string;
   notes: string;
-  type: "registration" | "one-time" | "followup" | "merge";
+  type: "one-time" | "followup" | "merge";
   lane: "center-trunk" | "left-branch" | "right-branch";
+  branchName?: string;
+  followupDate?: string;
   parents: string[];
 }
 
@@ -115,10 +117,8 @@ export function MedicalHistoryPlaceholder() {
       }
     });
 
-    // 1. Always establish the center trunk axis exactly down the middle
     const centerTrunkX = contentRect.width / 2;
 
-    // Draw the continuous green center trunk line covering the entire node span
     if (minY !== Infinity && maxY !== -Infinity) {
       newConnections.push({
         from: { x: centerTrunkX, y: minY - 30 },
@@ -129,7 +129,6 @@ export function MedicalHistoryPlaceholder() {
 
     const laneLastNodeId: Record<string, string> = { "left-branch": "", "right-branch": "" };
 
-    // 2. Draw branch tracks and horizontal intersection lines
     timeline.forEach((node) => {
       const childCoord = coordsMap[node.nodeId];
       if (!childCoord) return;
@@ -138,14 +137,12 @@ export function MedicalHistoryPlaceholder() {
         const previousSameLaneId = laneLastNodeId[node.lane];
 
         if (!previousSameLaneId) {
-          // START OF BRANCH: Straight horizontal line from center trunk out to the branch start
           newConnections.push({
             from: { x: centerTrunkX, y: childCoord.y },
             to: childCoord,
             isStart: true
           });
         } else {
-          // CONTINUING A BRANCH: Straight vertical line connecting the previous followup node to this one
           const prevCoord = coordsMap[previousSameLaneId];
           if (prevCoord) {
             newConnections.push({
@@ -155,21 +152,18 @@ export function MedicalHistoryPlaceholder() {
           }
         }
 
-        // END OF BRANCH (MERGE): Straight horizontal line back to center trunk
         if (node.type === "merge") {
           newConnections.push({
             from: childCoord,
             to: { x: centerTrunkX, y: childCoord.y },
             isMerge: true
           });
-          // Reset the lane so another branch can independently start later if needed
           laneLastNodeId[node.lane] = ""; 
         } else {
           laneLastNodeId[node.lane] = node.nodeId;
         }
       }
 
-      // 3. Draw horizontal dashed lines pointing to date/time metadata
       if (metadataMap[node.nodeId]) {
         newHorizontalLines.push({
           x1: childCoord.x + 10,
@@ -220,7 +214,7 @@ export function MedicalHistoryPlaceholder() {
       <div className="flex flex-row items-center justify-between border-b pb-3 shrink-0 bg-background relative z-20">
         <div>
           <h3 className="text-sm font-semibold tracking-wide text-primary uppercase">Clinical Timeline</h3>
-          <p className="text-xs text-muted-foreground mt-0.5">Click any node to spawn a follow-up branch or view details.</p>
+          <p className="text-xs text-muted-foreground mt-0.5">Click side-branch nodes to trigger secondary timeline offshoots.</p>
         </div>
         
         <div className="flex items-center gap-2">
@@ -230,7 +224,6 @@ export function MedicalHistoryPlaceholder() {
           </Button>
 
           <Button size="sm" className="h-8 text-xs gap-1.5" onClick={() => {
-            // FIX: Ensure new standard encounters drop cleanly on the main trunk line, totally detached from previous branches
             setSelectedParentId("");
             setInitialSpecialty("General");
             setInitialType("one-time");
@@ -247,15 +240,14 @@ export function MedicalHistoryPlaceholder() {
           {timeline.length > 0 && (
             <svg className="absolute inset-0 w-full h-full pointer-events-none z-0 overflow-visible">
               {connections.map((line, idx) => {
-                // Style Configuration Logic for Lines
-                let strokeColor = "#cbd5e1"; // default slate
+                let strokeColor = "#cbd5e1"; 
                 let strokeWidth = "2";
                 
                 if (line.isTrunk) {
-                  strokeColor = "#22c55e"; // Custom green for center trunk line
+                  strokeColor = "#22c55e"; 
                   strokeWidth = "3";
                 } else if (line.isStart || line.isMerge) {
-                  strokeColor = "#3b82f6"; // Blue for branch entering/exiting
+                  strokeColor = "#3b82f6"; 
                 }
 
                 return (
@@ -336,7 +328,7 @@ export function MedicalHistoryPlaceholder() {
   );
 }
 
-function TimelineNodeDot({ node, onBranchClick }: { node: TimelineNode, onBranchClick: (node: TimelineNode) => void }) {
+function TimelineNodeDot({ node, onBranchClick }: { node: TimelineNode; onBranchClick: (node: TimelineNode) => void }) {
   const ringColor = node.lane === "center-trunk" ? "ring-green-500/30 border-green-500 text-green-500" :
                     node.lane === "left-branch" ? "ring-blue-500/20 border-blue-500 text-blue-500" :
                     "ring-orange-500/20 border-orange-500 text-orange-500";
@@ -355,7 +347,20 @@ function TimelineNodeDot({ node, onBranchClick }: { node: TimelineNode, onBranch
             </span>
             <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">{node.date}</span>
           </div>
-          <h4 className="text-sm font-bold tracking-tight text-foreground pt-1">{node.complaint}</h4>
+          
+          {node.branchName && (
+            <div className="text-[10px] font-medium text-blue-600 dark:text-blue-400 bg-blue-500/5 dark:bg-blue-400/5 px-2 py-0.5 rounded border border-blue-200/40 inline-block truncate max-w-full mt-1">
+              Track: {node.branchName}
+            </div>
+          )}
+          
+          <h4 className="text-sm font-bold tracking-tight text-foreground pt-1">{node.complaint || "Routine Evaluation Check"}</h4>
+          
+          {node.followupDate && (
+            <div className="text-[10px] flex items-center gap-1 font-semibold text-emerald-600 pt-0.5">
+              <CalendarRange className="h-3 w-3" /> Scheduled Followup: {new Date(node.followupDate).toLocaleDateString("en-GB")}
+            </div>
+          )}
         </div>
         
         <div className="text-xs space-y-2">
@@ -363,25 +368,28 @@ function TimelineNodeDot({ node, onBranchClick }: { node: TimelineNode, onBranch
             <User className="h-4 w-4 text-primary shrink-0" /> 
             <span className="font-medium text-foreground">{node.doctor} <span className="text-muted-foreground font-normal">({node.specialty})</span></span>
           </div>
-          <div className="flex items-start gap-2 pt-1 border-t border-dashed">
-            <FileText className="h-4 w-4 text-primary shrink-0 mt-0.5" />
-            <div className="text-muted-foreground leading-normal">
-              <span className="font-semibold text-foreground block text-[11px] uppercase tracking-wide">Notes:</span>
-              <p className="mt-0.5 whitespace-pre-wrap">{node.notes}</p>
+          
+          {node.notes && (
+            <div className="flex items-start gap-2 pt-1 border-t border-dashed">
+              <FileText className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+              <div className="text-muted-foreground leading-normal">
+                <span className="font-semibold text-foreground block text-[11px] uppercase tracking-wide">Notes:</span>
+                <p className="mt-0.5 whitespace-pre-wrap">{node.notes}</p>
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
-        {/* Dynamic Branch Guard Layer - BLOCKS FOLLOW-UP FOR MERGED NODES */}
-        {node.type !== "merge" && node.type !== "one-time" ? (
+        {/* Core conditional strict branch filter parameter constraint layout block */}
+        {node.type !== "merge" && node.lane !== "center-trunk" ? (
           <div className="pt-2">
             <Button size="sm" variant="secondary" className="w-full h-8 text-xs font-semibold gap-1.5" onClick={() => onBranchClick(node)}>
               <GitBranchPlus className="h-3.5 w-3.5" /> Log Follow-up Here
             </Button>
           </div>
         ) : (
-          <div className="pt-2 text-center text-[11px] font-medium text-muted-foreground bg-muted/40 py-1.5 rounded-lg border border-dashed select-none">
-            {node.type === "merge" ? "Treatment Closed (Merged)" : "One-Time consultation event"}
+          <div className="pt-2 text-center text-[10px] font-medium text-muted-foreground bg-muted/40 py-1.5 rounded-lg border border-dashed select-none">
+            {node.type === "merge" ? "Treatment Closed (Merged)" : "Trunk consultation event - followup restricted"}
           </div>
         )}
       </HoverCardContent>
