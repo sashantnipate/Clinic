@@ -1,17 +1,12 @@
-// FILE: src/feature/patient-profile/components/medical-history-placeholder.tsx
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { Plus, User, FileText, Maximize2, Minimize2, GitBranchPlus, Loader2, Pill, Trash2 } from "lucide-react";
-import { getPatientClinicalTimeline, createClinicalEncounterAction } from "@/lib/actions/medical-history.actions";
+import { Maximize2, Minimize2, GitBranchPlus, Loader2, Plus, User, FileText } from "lucide-react";
+import { getPatientClinicalTimeline } from "@/lib/actions/medical-history.actions";
+import { LogEncounterModal } from "./log-encounter-modal";
 import { toast } from "sonner";
 
 interface TimelineNode {
@@ -28,12 +23,12 @@ interface TimelineNode {
   parents: string[];
 }
 
-interface MedicationFormInput {
-  name: string;
-  dosage: string;
-  frequency: string;
-  duration: string;
-  instructions: string;
+interface ConnectionLine {
+  from: { x: number; y: number };
+  to: { x: number; y: number };
+  isTrunk?: boolean;
+  isMerge?: boolean;
+  isStart?: boolean;
 }
 
 export function MedicalHistoryPlaceholder() {
@@ -44,9 +39,12 @@ export function MedicalHistoryPlaceholder() {
   const [modalOpen, setModalOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-  
-  const [connections, setConnections] = useState<Array<{ from: { x: number; y: number }; to: { x: number; y: number }; isCurve: boolean }>>([]);
+
+  const [selectedParentId, setSelectedParentId] = useState<string>("");
+  const [initialSpecialty, setInitialSpecialty] = useState("General");
+  const [initialType, setInitialType] = useState<TimelineNode["type"]>("one-time");
+
+  const [connections, setConnections] = useState<ConnectionLine[]>([]);
   const [horizontalLines, setHorizontalLines] = useState<Array<{ x1: number; y1: number; x2: number; y2: number }>>([]);
 
   const panelRef = useRef<HTMLDivElement>(null);
@@ -54,21 +52,12 @@ export function MedicalHistoryPlaceholder() {
   const nodeRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const metadataRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
-  const [selectedParentId, setSelectedParentId] = useState<string>("");
-  const [doctor, setDoctor] = useState("");
-  const [specialty, setSpecialty] = useState("General");
-  const [complaint, setComplaint] = useState("");
-  const [notes, setNotes] = useState("");
-  const [type, setType] = useState<TimelineNode["type"]>("one-time");
-  const [medications, setMedications] = useState<MedicationFormInput[]>([]);
-
   const loadTimelineRecords = useCallback(async () => {
     try {
       setIsLoading(true);
       const token = localStorage.getItem("clinic_jwt") || "";
       const res = await getPatientClinicalTimeline(token, patientId);
       if (res.success && res.data) {
-        // Chronological order (oldest first) simplifies tree generation paths
         const sorted = [...res.data].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
         setTimeline(sorted);
       }
@@ -85,9 +74,8 @@ export function MedicalHistoryPlaceholder() {
 
   const handleBranchFromNode = (node: TimelineNode) => {
     setSelectedParentId(node.nodeId);
-    setSpecialty(node.specialty);
-    setType("followup");
-    setMedications([]);
+    setInitialSpecialty(node.specialty);
+    setInitialType("followup");
     setModalOpen(true);
   };
 
@@ -95,21 +83,26 @@ export function MedicalHistoryPlaceholder() {
     if (!contentRef.current || timeline.length === 0) return;
     const contentRect = contentRef.current.getBoundingClientRect();
 
-    const newConnections: typeof connections = [];
+    const newConnections: ConnectionLine[] = [];
     const newHorizontalLines: typeof horizontalLines = [];
     const coordsMap: Record<string, { x: number; y: number; lane: string }> = {};
     const metadataMap: Record<string, { x: number; y: number }> = {};
 
-    // Map screen locations to coordinates relative to viewport canvas
+    let minY = Infinity;
+    let maxY = -Infinity;
+
     timeline.forEach((node) => {
       const el = nodeRefs.current[node.nodeId];
       if (el) {
         const rect = el.getBoundingClientRect();
+        const y = rect.top - contentRect.top + rect.height / 2;
         coordsMap[node.nodeId] = {
           x: rect.left - contentRect.left + rect.width / 2,
-          y: rect.top - contentRect.top + rect.height / 2,
+          y: y,
           lane: node.lane
         };
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
       }
       
       const metaEl = metadataRefs.current[node.nodeId];
@@ -122,41 +115,62 @@ export function MedicalHistoryPlaceholder() {
       }
     });
 
-    // Track the last discovered node in each swimming lane array sequence
-    const laneLastNodeId: Record<string, string> = { "center-trunk": "", "left-branch": "", "right-branch": "" };
+    // 1. Always establish the center trunk axis exactly down the middle
+    const centerTrunkX = contentRect.width / 2;
 
+    // Draw the continuous green center trunk line covering the entire node span
+    if (minY !== Infinity && maxY !== -Infinity) {
+      newConnections.push({
+        from: { x: centerTrunkX, y: minY - 30 },
+        to: { x: centerTrunkX, y: maxY + 30 },
+        isTrunk: true
+      });
+    }
+
+    const laneLastNodeId: Record<string, string> = { "left-branch": "", "right-branch": "" };
+
+    // 2. Draw branch tracks and horizontal intersection lines
     timeline.forEach((node) => {
       const childCoord = coordsMap[node.nodeId];
       if (!childCoord) return;
 
-      const previousSameLaneId = laneLastNodeId[node.lane];
+      if (node.lane !== "center-trunk") {
+        const previousSameLaneId = laneLastNodeId[node.lane];
 
-      if (previousSameLaneId) {
-        // Enforce straight track continuation within the same lane
-        const parentCoord = coordsMap[previousSameLaneId];
-        if (parentCoord) {
-          newConnections.push({ from: parentCoord, to: childCoord, isCurve: false });
-        }
-      } else {
-        // If this is the FIRST entry of a branch track, elegantly curve outward from its registered parent node
-        if (node.parents && node.parents.length > 0) {
-          const parentCoord = coordsMap[node.parents[0]];
-          if (parentCoord) {
-            newConnections.push({ from: parentCoord, to: childCoord, isCurve: true });
+        if (!previousSameLaneId) {
+          // START OF BRANCH: Straight horizontal line from center trunk out to the branch start
+          newConnections.push({
+            from: { x: centerTrunkX, y: childCoord.y },
+            to: childCoord,
+            isStart: true
+          });
+        } else {
+          // CONTINUING A BRANCH: Straight vertical line connecting the previous followup node to this one
+          const prevCoord = coordsMap[previousSameLaneId];
+          if (prevCoord) {
+            newConnections.push({
+              from: prevCoord,
+              to: childCoord
+            });
           }
         }
-      }
 
-      // Handle Merge Actions: Only connect back to trunk line upon explicit track resolution
-      if (node.type === "merge" && node.parents && node.parents.length > 1) {
-        const structuralTrunkParent = coordsMap[node.parents[1]];
-        if (structuralTrunkParent) {
-          newConnections.push({ from: structuralTrunkParent, to: childCoord, isCurve: true });
+        // END OF BRANCH (MERGE): Straight horizontal line back to center trunk
+        if (node.type === "merge") {
+          newConnections.push({
+            from: childCoord,
+            to: { x: centerTrunkX, y: childCoord.y },
+            isMerge: true
+          });
+          // Reset the lane so another branch can independently start later if needed
+          laneLastNodeId[node.lane] = ""; 
+        } else {
+          laneLastNodeId[node.lane] = node.nodeId;
         }
       }
 
-      // Map dotted baseline text tags for single standard consultations
-      if (node.type === "one-time" && metadataMap[node.nodeId]) {
+      // 3. Draw horizontal dashed lines pointing to date/time metadata
+      if (metadataMap[node.nodeId]) {
         newHorizontalLines.push({
           x1: childCoord.x + 10,
           y1: childCoord.y,
@@ -164,9 +178,6 @@ export function MedicalHistoryPlaceholder() {
           y2: metadataMap[node.nodeId].y
         });
       }
-
-      // Update lane pointer state cache
-      laneLastNodeId[node.lane] = node.nodeId;
     });
 
     setConnections(newConnections);
@@ -175,7 +186,7 @@ export function MedicalHistoryPlaceholder() {
 
   useEffect(() => {
     calculatePaths();
-    const timer = setTimeout(calculatePaths, 200);
+    const timer = setTimeout(calculatePaths, 250);
     window.addEventListener("resize", calculatePaths);
     return () => {
       window.removeEventListener("resize", calculatePaths);
@@ -192,51 +203,6 @@ export function MedicalHistoryPlaceholder() {
     }
   };
 
-  const handleFormSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!doctor || !complaint || isSaving) return;
-
-    try {
-      setIsSaving(true);
-      const token = localStorage.getItem("clinic_jwt") || "";
-      
-      let calculatedLane: TimelineNode["lane"] = "center-trunk";
-      if (type === "followup") {
-        calculatedLane = specialty === "General" || specialty === "Cardiology" || specialty === "Dermatology" ? "left-branch" : "right-branch";
-      }
-
-      let parents = selectedParentId ? [selectedParentId] : [];
-      if (type === "merge") {
-        const lastTrunkNode = [...timeline].reverse().find(n => n.lane === "center-trunk")?.nodeId;
-        if (lastTrunkNode && lastTrunkNode !== selectedParentId) {
-          parents.push(lastTrunkNode);
-        }
-      }
-
-      const res = await createClinicalEncounterAction(token, {
-        patientId, doctor, specialty, complaint, notes, type, lane: calculatedLane, parents,
-        prescriptionRx: medications.filter(m => m.name.trim().length > 0)
-      });
-
-      if (res.success) {
-        toast.success("Encounter file saved securely.");
-        setModalOpen(false);
-        setDoctor("");
-        setComplaint("");
-        setNotes("");
-        setMedications([]);
-        await loadTimelineRecords();
-      } else {
-        toast.error(res.error || "Failed to commit record updates.");
-      }
-    } catch {
-      toast.error("Network interface connection failure.");
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  // Render template lists in standard reverse presentation timeline (newest on top)
   const displayTimeline = [...timeline].reverse();
 
   if (isLoading) {
@@ -263,72 +229,15 @@ export function MedicalHistoryPlaceholder() {
             {isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
           </Button>
 
-          <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm" className="h-8 text-xs gap-1.5" onClick={() => {
-                setSelectedParentId(timeline[timeline.length - 1]?.nodeId || "");
-                setType("one-time");
-                setMedications([]);
-              }}>
-                <Plus className="h-3.5 w-3.5" /> Log Encounter
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto" container={panelRef.current || undefined}>
-              <DialogHeader>
-                <DialogTitle>Append Medical Note & Script</DialogTitle>
-                <DialogDescription>Originating baseline parent context node link ID: <span className="font-mono font-bold text-primary">{selectedParentId || "None"}</span></DialogDescription>
-              </DialogHeader>
-              
-              <form onSubmit={handleFormSubmit} className="space-y-4 pt-2">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="grid gap-1.5">
-                    <Label className="text-xs">Doctor Name</Label>
-                    <Input required placeholder="Dr. Name" value={doctor} onChange={(e) => setDoctor(e.target.value)} className="h-9 text-xs" />
-                  </div>
-                  <div className="grid gap-1.5">
-                    <Label className="text-xs">Specialty</Label>
-                    <Select value={specialty} onValueChange={setSpecialty}>
-                      <SelectTrigger className="text-xs h-9"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="General">General</SelectItem>
-                        <SelectItem value="Cardiology">Cardiology</SelectItem>
-                        <SelectItem value="Orthopedics">Orthopedics</SelectItem>
-                        <SelectItem value="Dermatology">Dermatology</SelectItem>
-                        <SelectItem value="Neurology">Neurology</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                <div className="grid gap-1.5">
-                  <Label className="text-xs">Encounter Type</Label>
-                  <Select value={type} onValueChange={(v: any) => setType(v)}>
-                    <SelectTrigger className="text-xs h-9"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="one-time">One Time Visit (Trunk)</SelectItem>
-                      <SelectItem value="followup">Follow-up Needed (Branch)</SelectItem>
-                      <SelectItem value="merge">Complete Treatment (Merge)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="grid gap-1.5">
-                  <Label className="text-xs">Diagnosis / Complaint</Label>
-                  <Input required placeholder="Evaluation parameters..." value={complaint} onChange={(e) => setComplaint(e.target.value)} className="h-9 text-xs" />
-                </div>
-                <div className="grid gap-1.5">
-                  <Label className="text-xs">Notes</Label>
-                  <Textarea rows={2} placeholder="Observations description context..." value={notes} onChange={(e) => setNotes(e.target.value)} className="text-xs resize-none" />
-                </div>
-
-                <DialogFooter className="pt-2">
-                  <Button type="submit" disabled={isSaving} className="w-full text-xs font-semibold h-9">
-                    {isSaving ? "Persisting Assets..." : "Save Clinical Record"}
-                  </Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
+          <Button size="sm" className="h-8 text-xs gap-1.5" onClick={() => {
+            // FIX: Ensure new standard encounters drop cleanly on the main trunk line, totally detached from previous branches
+            setSelectedParentId("");
+            setInitialSpecialty("General");
+            setInitialType("one-time");
+            setModalOpen(true);
+          }}>
+            <Plus className="h-3.5 w-3.5" /> Log Encounter
+          </Button>
         </div>
       </div>
 
@@ -337,24 +246,36 @@ export function MedicalHistoryPlaceholder() {
           
           {timeline.length > 0 && (
             <svg className="absolute inset-0 w-full h-full pointer-events-none z-0 overflow-visible">
-              {connections.map((line, idx) => (
-                <path
-                  key={`track-link-${idx}`}
-                  d={line.isCurve 
-                    ? `M ${line.from.x} ${line.from.y} C ${line.from.x} ${(line.from.y + line.to.y) / 2}, ${line.to.x} ${(line.from.y + line.to.y) / 2}, ${line.to.x} ${line.to.y}`
-                    : `M ${line.from.x} ${line.from.y} L ${line.to.x} ${line.to.y}`
-                  }
-                  fill="none"
-                  stroke="var(--color-muted-foreground)"
-                  strokeWidth="1.5"
-                  className="opacity-40 transition-all duration-300 ease-in-out"
-                />
-              ))}
+              {connections.map((line, idx) => {
+                // Style Configuration Logic for Lines
+                let strokeColor = "#cbd5e1"; // default slate
+                let strokeWidth = "2";
+                
+                if (line.isTrunk) {
+                  strokeColor = "#22c55e"; // Custom green for center trunk line
+                  strokeWidth = "3";
+                } else if (line.isStart || line.isMerge) {
+                  strokeColor = "#3b82f6"; // Blue for branch entering/exiting
+                }
+
+                return (
+                  <path
+                    key={`track-link-${idx}`}
+                    d={`M ${line.from.x} ${line.from.y} L ${line.to.x} ${line.to.y}`}
+                    fill="none"
+                    stroke={strokeColor}
+                    strokeWidth={strokeWidth}
+                    strokeDasharray={line.isMerge || line.isStart ? "6 4" : undefined}
+                    className="opacity-70 transition-all duration-300 ease-in-out"
+                  />
+                );
+              })}
+              
               {horizontalLines.map((line, idx) => (
                 <line 
                   key={`horiz-hint-${idx}`}
                   x1={line.x1} y1={line.y1} x2={line.x2} y2={line.y2}
-                  stroke="var(--color-muted-foreground)"
+                  stroke="#cbd5e1"
                   strokeWidth="1.5"
                   strokeDasharray="4 4"
                   className="opacity-40 transition-all duration-300 ease-in-out"
@@ -370,7 +291,6 @@ export function MedicalHistoryPlaceholder() {
 
               return (
                 <div key={node.nodeId} className="grid grid-cols-12 items-center relative min-h-[28px]">
-                  
                   <div className="col-span-4 flex justify-center">
                     {isLeft && <div ref={(el) => { nodeRefs.current[node.nodeId] = el; }}><TimelineNodeDot node={node} onBranchClick={handleBranchFromNode} /></div>}
                   </div>
@@ -390,7 +310,6 @@ export function MedicalHistoryPlaceholder() {
                     <span>{node.date}</span>
                     <span className="font-normal text-muted-foreground/50 lowercase text-[9px]">{node.time}</span>
                   </div>
-
                 </div>
               );
             })}
@@ -402,12 +321,23 @@ export function MedicalHistoryPlaceholder() {
         </div>
       </div>
 
+      <LogEncounterModal
+        open={modalOpen}
+        onOpenChange={setModalOpen}
+        patientId={patientId}
+        selectedParentId={selectedParentId}
+        initialSpecialty={initialSpecialty}
+        initialType={initialType}
+        latestTimelineNodes={timeline}
+        onSuccess={loadTimelineRecords}
+        containerRef={panelRef.current}
+      />
     </div>
   );
 }
 
 function TimelineNodeDot({ node, onBranchClick }: { node: TimelineNode, onBranchClick: (node: TimelineNode) => void }) {
-  const ringColor = node.lane === "center-trunk" ? "ring-muted-foreground/30 border-muted-foreground text-muted-foreground" :
+  const ringColor = node.lane === "center-trunk" ? "ring-green-500/30 border-green-500 text-green-500" :
                     node.lane === "left-branch" ? "ring-blue-500/20 border-blue-500 text-blue-500" :
                     "ring-orange-500/20 border-orange-500 text-orange-500";
 
@@ -442,11 +372,18 @@ function TimelineNodeDot({ node, onBranchClick }: { node: TimelineNode, onBranch
           </div>
         </div>
 
-        <div className="pt-2">
-          <Button size="sm" variant="secondary" className="w-full h-8 text-xs font-semibold gap-1.5" onClick={() => onBranchClick(node)}>
-            <GitBranchPlus className="h-3.5 w-3.5" /> Log Follow-up Here
-          </Button>
-        </div>
+        {/* Dynamic Branch Guard Layer - BLOCKS FOLLOW-UP FOR MERGED NODES */}
+        {node.type !== "merge" && node.type !== "one-time" ? (
+          <div className="pt-2">
+            <Button size="sm" variant="secondary" className="w-full h-8 text-xs font-semibold gap-1.5" onClick={() => onBranchClick(node)}>
+              <GitBranchPlus className="h-3.5 w-3.5" /> Log Follow-up Here
+            </Button>
+          </div>
+        ) : (
+          <div className="pt-2 text-center text-[11px] font-medium text-muted-foreground bg-muted/40 py-1.5 rounded-lg border border-dashed select-none">
+            {node.type === "merge" ? "Treatment Closed (Merged)" : "One-Time consultation event"}
+          </div>
+        )}
       </HoverCardContent>
     </HoverCard>
   );
