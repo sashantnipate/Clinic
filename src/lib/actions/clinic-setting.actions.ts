@@ -10,6 +10,12 @@ interface UpdateClinicParams {
   address: string;
   phone: string;
   timings: Array<{ days: string; open: string; close: string }>;
+  socialLinks?: {
+    instagram?: string;
+    facebook?: string;
+    x?: string;
+    website?: string;
+  };
 }
 
 export async function updateClinicSettingAction(token: string, params: UpdateClinicParams) {
@@ -34,6 +40,7 @@ export async function updateClinicSettingAction(token: string, params: UpdateCli
         address: params.address,
         phone: params.phone,
         timings: params.timings,
+        socialLinks: params.socialLinks,
       },
       { new: true, upsert: true }
     );
@@ -57,9 +64,9 @@ export async function getClinicSettingAction(token: string) {
     // Find settings or return fallback defaults if it doesn't exist yet
     const clinicSetting = await ClinicSetting.findOne({ ownerOrgId: orgId }).lean();
 
-    return { 
-      success: true, 
-      data: clinicSetting ? JSON.parse(JSON.stringify(clinicSetting)) : null 
+    return {
+      success: true,
+      data: clinicSetting ? JSON.parse(JSON.stringify(clinicSetting)) : null
     };
   } catch (error: any) {
     console.error("Failed to fetch clinic settings:", error);
