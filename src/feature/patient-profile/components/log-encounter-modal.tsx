@@ -19,24 +19,27 @@ interface LogEncounterModalProps {
   initialSpecialty?: string;
   initialType?: "one-time" | "followup" | "merge";
   latestTimelineNodes: any[];
+  editableEncounter?: any;
   onSuccess: () => void;
   containerRef?: HTMLElement | null;
 }
 
 export function LogEncounterModal(props: LogEncounterModalProps) {
-  const hook = useLogEncounter(props);
+  const hook = useLogEncounter({ ...props, initialSpecialty: props.initialSpecialty || "General", initialType: props.initialType || "one-time" });
 
   if (!hook.isUserLoaded) return null;
 
   return (
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
-      <DialogContent className="w-[96vw] md:max-w-5xl max-h-[94vh] overflow-y-auto p-6" container={props.containerRef || undefined}>
+      <DialogContent className="w-[96vw] md:max-w-5xl max-h-[94vh] overflow-y-auto p-6">
         <DialogHeader className="border-b pb-3">
           <DialogTitle className="text-lg font-bold flex items-center gap-2">
-            <ClipboardList className="h-5 w-5 text-primary" /> Log Clinical Case Encounter
+            <ClipboardList className="h-5 w-5 text-primary" /> {props.editableEncounter ? "Edit Clinical Case Encounter" : "Log Clinical Case Encounter"}
           </DialogTitle>
           <DialogDescription className="text-xs text-stone-400">
-            {props.selectedParentId ? (
+            {props.editableEncounter ? (
+              <span>Modifying existing history node: <code>{props.editableEncounter.nodeId || props.editableEncounter._id}</code></span>
+            ) : props.selectedParentId ? (
               <span>Continuing history node tracking from parent record trace: <code>{props.selectedParentId}</code></span>
             ) : (
               "Initiating baseline clinical ledger assessment entry block tracker."
@@ -160,7 +163,7 @@ export function LogEncounterModal(props: LogEncounterModalProps) {
               {hook.isSaving ? (
                 <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Syncing Record...</>
               ) : (
-                <><Save className="h-3.5 w-3.5" /> Save Encounter Entry</>
+                <><Save className="h-3.5 w-3.5" /> {props.editableEncounter ? "Update Encounter Entry" : "Save Encounter Entry"}</>
               )}
             </Button>
           </DialogFooter>

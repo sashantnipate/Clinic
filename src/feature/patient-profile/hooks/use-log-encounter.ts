@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useUser } from "@clerk/nextjs";
-import { createClinicalEncounterAction } from "@/lib/actions/medical-history.actions";
+import { createClinicalEncounterAction, updateClinicalEncounterAction, getPrescriptionForEncounterAction } from "@/lib/actions/medical-history.actions";
 import { getDoctorAssignedDepartmentsAction } from "@/lib/actions/department.actions";
 import { getPharmacyItems } from "@/lib/actions/pharmacy.actions";
 import { toast } from "sonner";
@@ -20,9 +20,10 @@ interface UseLogEncounterProps {
   open: boolean;
   patientId: string;
   selectedParentId: string;
-  initialSpecialty: string;
+  initialSpecialty?: string;
   initialType: "one-time" | "followup" | "merge";
   latestTimelineNodes: any[];
+  editableEncounter?: any;
   onSuccess: () => void;
   onOpenChange: (open: boolean) => void;
 }
@@ -34,6 +35,7 @@ export function useLogEncounter({
   initialSpecialty,
   initialType,
   latestTimelineNodes,
+  editableEncounter,
   onSuccess,
   onOpenChange,
 }: UseLogEncounterProps) {
@@ -85,23 +87,73 @@ export function useLogEncounter({
 
   useEffect(() => {
     if (open) {
-      setComplaint("");
-      setNotes("");
-      setMedications([{ name: "", dosageQuantity: "", timingInterval: "", durationDays: "", relationToFood: "" }]);
-      setGlobalInstructions("");
-      setFollowupDate("");
+      if (editableEncounter) {
+        setComplaint(editableEncounter.complaint || "");
+        setNotes(editableEncounter.notes || "");
+        setType(editableEncounter.type);
+        setSpecialty(editableEncounter.specialty || "General");
+        setBranchName(editableEncounter.branchName || "");
+        setFollowupDate(editableEncounter.followupDate || "");
 
-      if (selectedParentId) {
-        setType("followup");
-        setBranchName(parentNode?.branchName || "Sub-Branch Thread");
-        setSpecialty(parentNode?.specialty || "General");
+        const fetchMeds = async () => {
+          const token = localStorage.getItem("clinic_jwt") || "";
+          const encounterId = editableEncounter._id || editableEncounter.id;
+          if (encounterId) {
+            const res = await getPrescriptionForEncounterAction(token, encounterId);
+            if (res.success && res.data && res.data.medications && res.data.medications.length > 0) {
+              const parsedMeds: MedicationExcelRow[] = res.data.medications.map((m: any) => {
+                let parsedInstructions: any = {};
+                try { if (m.instructions) parsedInstructions = JSON.parse(m.instructions); } catch (e) { }
+
+                const freqStr = m.frequency || "";
+                let dosage = "";
+                let timing = freqStr;
+                if (freqStr.includes("(") && freqStr.endsWith(")")) {
+                  const parts = freqStr.split("(");
+                  timing = parts[0].trim();
+                  dosage = parts[1].slice(0, -1).trim();
+                }
+
+                if (parsedInstructions.globalNotes) {
+                  setGlobalInstructions(parsedInstructions.globalNotes);
+                }
+
+                return {
+                  name: m.name,
+                  dosageQuantity: dosage,
+                  timingInterval: timing,
+                  durationDays: m.duration || "",
+                  relationToFood: parsedInstructions.relationToFood || ""
+                };
+              });
+              setMedications(parsedMeds);
+            } else {
+              setMedications([{ name: "", dosageQuantity: "", timingInterval: "", durationDays: "", relationToFood: "" }]);
+              setGlobalInstructions("");
+            }
+          }
+        };
+        fetchMeds();
+
       } else {
-        setType(initialType);
-        setBranchName("");
-        setSpecialty(initialSpecialty);
+        setComplaint("");
+        setNotes("");
+        setMedications([{ name: "", dosageQuantity: "", timingInterval: "", durationDays: "", relationToFood: "" }]);
+        setGlobalInstructions("");
+        setFollowupDate("");
+
+        if (selectedParentId) {
+          setType("followup");
+          setBranchName(parentNode?.branchName || "Sub-Branch Thread");
+          setSpecialty(parentNode?.specialty || "General");
+        } else {
+          setType(initialType);
+          setBranchName("");
+          setSpecialty(initialSpecialty);
+        }
       }
     }
-  }, [open, initialType, selectedParentId, parentNode, initialSpecialty]);
+  }, [open, initialType, selectedParentId, parentNode, initialSpecialty, editableEncounter]);
 
   const handleAddExcelRow = () => {
     setMedications([...medications, { name: "", dosageQuantity: "", timingInterval: "", durationDays: "", relationToFood: "" }]);
@@ -153,7 +205,9 @@ export function useLogEncounter({
         }
       }
 
-      const res = await createClinicalEncounterAction(token, {
+      let res;
+
+      const encounterPayload = {
         patientId,
         doctor: doctorName,
         specialty: specialty || "General",
@@ -165,10 +219,16 @@ export function useLogEncounter({
         followupDate: type === "followup" ? followupDate : undefined,
         parents,
         prescriptionRx: compiledPrescriptions,
-      });
+      };
+
+      if (editableEncounter) {
+        res = await updateClinicalEncounterAction(token, editableEncounter._id || editableEncounter.id, encounterPayload);
+      } else {
+        res = await createClinicalEncounterAction(token, encounterPayload);
+      }
 
       if (res.success) {
-        toast.success("Encounter tracked successfully.");
+        toast.success(editableEncounter ? "Encounter updated successfully." : "Encounter tracked successfully.");
         onOpenChange(false);
         router.refresh();
         onSuccess();

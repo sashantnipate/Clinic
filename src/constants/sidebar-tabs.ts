@@ -6,6 +6,7 @@ export const SIDEBAR_TABS = [
   { id: "/patients", label: "Patients", icon: Users },
   { id: "/forms", label: "Custom Forms", icon: FileSpreadsheet },
   { id: "/pharmacy", label: "Pharmacy", icon: Pill },
+  { id: "/notification", label: "Notification", icon: Bell},
   { id: "/clinic-profile", label: "Clinic Profile", icon: Building2 },
   { id: "/settings", label: "Access Settings", icon: Settings },
   

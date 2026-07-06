@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
-import { Maximize2, Minimize2, GitBranchPlus, Loader2, Plus, User, FileText, CalendarRange, FileDown } from "lucide-react";
+import { Maximize2, Minimize2, GitBranchPlus, Loader2, Plus, User, FileText, CalendarRange, FileDown, Edit } from "lucide-react";
 import { getPatientClinicalTimeline } from "@/lib/actions/medical-history.actions";
 import { LogEncounterModal } from "./log-encounter-modal";
 import { PrescriptionExportDialog } from "@/feature/prescription-pdf/components/prescription-export-dialog";
@@ -49,6 +49,7 @@ export function MedicalHistoryPlaceholder() {
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [initialSpecialty, setInitialSpecialty] = useState("General");
   const [initialType, setInitialType] = useState<TimelineNode["type"]>("one-time");
+  const [editableEncounter, setEditableEncounter] = useState<TimelineNode | null>(null);
 
   const [connections, setConnections] = useState<ConnectionLine[]>([]);
   const [horizontalLines, setHorizontalLines] = useState<Array<{ x1: number; y1: number; x2: number; y2: number }>>([]);
@@ -82,6 +83,13 @@ export function MedicalHistoryPlaceholder() {
     setSelectedParentId(node.nodeId);
     setInitialSpecialty(node.specialty);
     setInitialType("followup");
+    setEditableEncounter(null);
+    setModalOpen(true);
+  };
+
+  const handleEditEncounter = (node: TimelineNode) => {
+    setEditableEncounter(node);
+    setSelectedParentId("");
     setModalOpen(true);
   };
 
@@ -142,29 +150,31 @@ export function MedicalHistoryPlaceholder() {
       });
     }
 
-    const laneLastNodeId: Record<string, string> = { "left-branch": "", "right-branch": "" };
-
     timeline.forEach((node) => {
       const childCoord = coordsMap[node.nodeId];
       if (!childCoord) return;
 
       if (node.lane !== "center-trunk") {
-        const previousSameLaneId = laneLastNodeId[node.lane];
+        const parentId = node.parents?.[0];
+        let connectedToBranchParent = false;
 
-        if (!previousSameLaneId) {
+        if (parentId) {
+          const parentCoord = coordsMap[parentId];
+          if (parentCoord && parentCoord.lane !== "center-trunk") {
+            newConnections.push({
+              from: parentCoord,
+              to: childCoord
+            });
+            connectedToBranchParent = true;
+          }
+        }
+
+        if (!connectedToBranchParent) {
           newConnections.push({
             from: { x: centerTrunkX, y: childCoord.y },
             to: childCoord,
             isStart: true
           });
-        } else {
-          const prevCoord = coordsMap[previousSameLaneId];
-          if (prevCoord) {
-            newConnections.push({
-              from: prevCoord,
-              to: childCoord
-            });
-          }
         }
 
         if (node.type === "merge") {
@@ -173,9 +183,6 @@ export function MedicalHistoryPlaceholder() {
             to: { x: centerTrunkX, y: childCoord.y },
             isMerge: true
           });
-          laneLastNodeId[node.lane] = "";
-        } else {
-          laneLastNodeId[node.lane] = node.nodeId;
         }
       }
 
@@ -299,15 +306,15 @@ export function MedicalHistoryPlaceholder() {
               return (
                 <div key={node.nodeId} className="grid grid-cols-12 items-center relative min-h-[28px]">
                   <div className="col-span-4 flex justify-center">
-                    {isLeft && <div ref={(el) => { nodeRefs.current[node.nodeId] = el; }}><TimelineNodeDot node={node} onBranchClick={handleBranchFromNode} onExportClick={handleExportPrescription} /></div>}
+                    {isLeft && <div ref={(el) => { nodeRefs.current[node.nodeId] = el; }}><TimelineNodeDot node={node} onBranchClick={handleBranchFromNode} onExportClick={handleExportPrescription} onEditClick={handleEditEncounter} /></div>}
                   </div>
 
                   <div className="col-span-4 flex justify-center">
-                    {!isLeft && !isRight && <div ref={(el) => { nodeRefs.current[node.nodeId] = el; }}><TimelineNodeDot node={node} onBranchClick={handleBranchFromNode} onExportClick={handleExportPrescription} /></div>}
+                    {!isLeft && !isRight && <div ref={(el) => { nodeRefs.current[node.nodeId] = el; }}><TimelineNodeDot node={node} onBranchClick={handleBranchFromNode} onExportClick={handleExportPrescription} onEditClick={handleEditEncounter} /></div>}
                   </div>
 
                   <div className="col-span-4 flex justify-center">
-                    {isRight && <div ref={(el) => { nodeRefs.current[node.nodeId] = el; }}><TimelineNodeDot node={node} onBranchClick={handleBranchFromNode} onExportClick={handleExportPrescription} /></div>}
+                    {isRight && <div ref={(el) => { nodeRefs.current[node.nodeId] = el; }}><TimelineNodeDot node={node} onBranchClick={handleBranchFromNode} onExportClick={handleExportPrescription} onEditClick={handleEditEncounter} /></div>}
                   </div>
 
                   <div
@@ -336,6 +343,7 @@ export function MedicalHistoryPlaceholder() {
         initialSpecialty={initialSpecialty}
         initialType={initialType}
         latestTimelineNodes={timeline}
+        editableEncounter={editableEncounter}
         onSuccess={loadTimelineRecords}
         containerRef={panelRef.current}
       />
@@ -354,10 +362,12 @@ function TimelineNodeDot({
   node,
   onBranchClick,
   onExportClick,
+  onEditClick,
 }: {
   node: TimelineNode;
   onBranchClick: (node: TimelineNode) => void;
   onExportClick: (node: TimelineNode) => void;
+  onEditClick: (node: TimelineNode) => void;
 }) {
   const ringColor = node.lane === "center-trunk" ? "ring-green-500/30 border-green-500 text-green-500" :
     node.lane === "left-branch" ? "ring-blue-500/20 border-blue-500 text-blue-500" :
@@ -411,6 +421,9 @@ function TimelineNodeDot({
         </div>
 
         <div className="space-y-2 pt-2">
+          <Button size="sm" variant="outline" className="w-full h-8 text-xs font-semibold gap-1.5" onClick={() => onEditClick(node)}>
+            <Edit className="h-3.5 w-3.5" /> Edit Encounter Details
+          </Button>
           <Button size="sm" variant="outline" className="w-full h-8 text-xs font-semibold gap-1.5" onClick={() => onExportClick(node)}>
             <FileDown className="h-3.5 w-3.5" /> Export Prescription PDF
           </Button>

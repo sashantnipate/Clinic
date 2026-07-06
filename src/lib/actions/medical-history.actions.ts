@@ -9,8 +9,8 @@ interface LogEncounterParams {
   patientId: string;
   doctor?: string;
   specialty?: string;
-  complaint?: string; 
-  notes?: string;     
+  complaint?: string;
+  notes?: string;
   type: "one-time" | "followup" | "merge";
   lane: "center-trunk" | "left-branch" | "right-branch";
   branchName?: string;
@@ -58,8 +58,8 @@ export async function createClinicalEncounterAction(token: string, params: LogEn
       time: now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
       doctor: params.doctor || "Unknown Doctor",
       specialty: params.specialty || "General",
-      complaint: params.complaint?.trim() || "", 
-      notes: params.notes?.trim() || "",        
+      complaint: params.complaint?.trim() || "",
+      notes: params.notes?.trim() || "",
       type: params.type,
       lane: params.lane,
       branchName: params.branchName?.trim() || undefined,
@@ -110,6 +110,70 @@ export async function fillPrescriptionAction(token: string, rxId: string, payloa
 
     return { success: true, data: JSON.parse(JSON.stringify(rx)) };
   } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+export async function getPrescriptionForEncounterAction(token: string, encounterId: string) {
+  try {
+    const session = await verifyJWTString(token);
+    if (!session) return { success: false, error: "Unauthorized" };
+
+    await connectToDB();
+    const prescription = await Prescription.findOne({ encounterId: new mongoose.Types.ObjectId(encounterId) }).lean();
+
+    return { success: true, data: JSON.parse(JSON.stringify(prescription || null)) };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+export async function updateClinicalEncounterAction(token: string, encounterId: string, params: LogEncounterParams) {
+  try {
+    const session = await verifyJWTString(token);
+    if (!session) return { success: false, error: "Unauthorized" };
+
+    await connectToDB();
+
+    const updatedEncounter = await MedicalEncounter.findByIdAndUpdate(
+      encounterId,
+      {
+        specialty: params.specialty || "General",
+        complaint: params.complaint?.trim() || "",
+        notes: params.notes?.trim() || "",
+        type: params.type,
+        lane: params.lane,
+        branchName: params.branchName?.trim() || undefined,
+        followupDate: params.type === "followup" ? params.followupDate : undefined,
+      },
+      { new: true }
+    );
+
+    if (!updatedEncounter) {
+      return { success: false, error: "Encounter not found" };
+    }
+
+    if (params.prescriptionRx && params.prescriptionRx.length > 0) {
+      const existingPrescription = await Prescription.findOne({ encounterId: updatedEncounter._id });
+      if (existingPrescription) {
+        existingPrescription.medications = params.prescriptionRx;
+        await existingPrescription.save();
+      } else {
+        await Prescription.create({
+          patientId: new mongoose.Types.ObjectId(params.patientId),
+          encounterId: updatedEncounter._id,
+          prescribedBy: params.doctor || "Unknown Doctor",
+          medications: params.prescriptionRx,
+          status: "active"
+        });
+      }
+    } else {
+      await Prescription.deleteOne({ encounterId: updatedEncounter._id });
+    }
+
+    return { success: true, data: JSON.parse(JSON.stringify(updatedEncounter)) };
+  } catch (error: any) {
+    console.error("Encounter update mutation trace failure:", error);
     return { success: false, error: error.message };
   }
 }
