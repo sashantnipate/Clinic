@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useUser } from "@clerk/nextjs";
 import { createClinicalEncounterAction } from "@/lib/actions/medical-history.actions";
-import { getDepartmentsAction } from "@/lib/actions/department.actions";
+import { getDoctorAssignedDepartmentsAction } from "@/lib/actions/department.actions";
 import { getPharmacyItems } from "@/lib/actions/pharmacy.actions";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
@@ -12,6 +12,7 @@ export interface MedicationExcelRow {
   name: string;
   dosageQuantity: string;
   timingInterval: string;
+  durationDays: string;
   relationToFood: string;
 }
 
@@ -48,7 +49,6 @@ export function useLogEncounter({
   const [branchName, setBranchName] = useState("");
   const [medications, setMedications] = useState<MedicationExcelRow[]>([]);
   const [globalInstructions, setGlobalInstructions] = useState("");
-  const [courseDays, setCourseDays] = useState("");
   const [followupDate, setFollowupDate] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
@@ -57,7 +57,7 @@ export function useLogEncounter({
       try {
         const token = localStorage.getItem("clinic_jwt") || "";
         const [deptRes, pharmacyRes] = await Promise.all([
-          getDepartmentsAction(token),
+          getDoctorAssignedDepartmentsAction(token),
           getPharmacyItems(token),
         ]);
 
@@ -87,9 +87,8 @@ export function useLogEncounter({
     if (open) {
       setComplaint("");
       setNotes("");
-      setMedications([{ name: "", dosageQuantity: "", timingInterval: "2 times a day", relationToFood: "" }]);
+      setMedications([{ name: "", dosageQuantity: "", timingInterval: "", durationDays: "", relationToFood: "" }]);
       setGlobalInstructions("");
-      setCourseDays("");
       setFollowupDate("");
 
       if (selectedParentId) {
@@ -105,7 +104,7 @@ export function useLogEncounter({
   }, [open, initialType, selectedParentId, parentNode, initialSpecialty]);
 
   const handleAddExcelRow = () => {
-    setMedications([...medications, { name: "", dosageQuantity: "", timingInterval: "2 times a day", relationToFood: "" }]);
+    setMedications([...medications, { name: "", dosageQuantity: "", timingInterval: "", durationDays: "", relationToFood: "" }]);
   };
 
   const handleRemoveExcelRow = (index: number) => {
@@ -124,10 +123,10 @@ export function useLogEncounter({
       .filter(m => m.name.trim() !== "")
       .map(m => ({
         name: m.name.trim(),
-        frequency: m.dosageQuantity ? `${m.timingInterval} (${m.dosageQuantity})` : m.timingInterval,
-        duration: courseDays ? `${courseDays} Days` : "As directed",
+        frequency: m.dosageQuantity.trim() ? `${m.timingInterval.trim()} (${m.dosageQuantity.trim()})` : m.timingInterval.trim(),
+        duration: m.durationDays.trim() || "",
         instructions: JSON.stringify({
-          relationToFood: m.relationToFood || undefined,
+          relationToFood: m.relationToFood.trim() || undefined,
           globalNotes: globalInstructions.trim() || undefined
         })
       }));
@@ -194,7 +193,6 @@ export function useLogEncounter({
     branchName, setBranchName,
     medications,
     globalInstructions, setGlobalInstructions,
-    courseDays, setCourseDays,
     followupDate, setFollowupDate,
     isSaving,
     isUserLoaded,

@@ -50,7 +50,7 @@ export function LogEncounterModal(props: LogEncounterModalProps) {
               <Label className="text-xs font-semibold text-stone-500">Treating Clinician</Label>
               <Input value={hook.doctorName} disabled className="bg-stone-50 text-stone-700 cursor-not-allowed font-medium h-9 text-xs" />
             </div>
-            
+
             <div className="grid gap-1.5">
               <Label className="text-xs font-semibold">Assigned Clinic Department</Label>
               <Select value={hook.specialty} onValueChange={hook.setSpecialty}>
@@ -119,13 +119,13 @@ export function LogEncounterModal(props: LogEncounterModalProps) {
 
             <div className="border border-stone-200 rounded-xl bg-white shadow-2xs overflow-visible">
               <div className="min-w-[760px] text-xs">
-                <div className="grid grid-cols-12 bg-stone-50/70 font-bold uppercase tracking-wider text-stone-400 text-[10px] py-2.5 px-4 text-left divide-x divide-stone-100 border-b border-stone-200">
-                  <div className="col-span-4 pl-1">Drug formulation name</div>
-                  <div className="col-span-2 pl-3">Quantity / Vol</div>
-                  <div className="col-span-2 pl-3">Time Interval</div>
-                  <div className="col-span-2 pl-3">Duration</div>
-                  <div className="col-span-1 pl-3">Food</div>
-                  <div className="col-span-1 text-center">Action</div>
+                <div className="grid grid-cols-12 bg-stone-50/70 font-bold uppercase tracking-wider text-stone-400 text-[10px] py-2 text-left divide-x divide-stone-100 border-b border-stone-200">
+                  <div className="col-span-3 px-2 py-1 flex items-center">Drug formulation name</div>
+                  <div className="col-span-2 px-2 py-1 flex items-center">Quantity / Vol</div>
+                  <div className="col-span-2 px-2 py-1 flex items-center">Time Interval</div>
+                  <div className="col-span-2 px-2 py-1 flex items-center">Duration</div>
+                  <div className="col-span-2 px-2 py-1 flex items-center">Food</div>
+                  <div className="col-span-1 py-1 flex items-center justify-center">Action</div>
                 </div>
 
                 <div className="divide-y divide-stone-100 bg-white overflow-visible">
