@@ -1,5 +1,5 @@
 import React from "react";
-import { Document, Image, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
+import { Document, Image, Page, StyleSheet, Text, View, Svg, Path, Circle, Rect } from "@react-pdf/renderer";
 import type { PrescriptionPdfPayload, PrescriptionPdfSections } from "../types";
 
 const styles = StyleSheet.create({
@@ -12,26 +12,63 @@ const styles = StyleSheet.create({
     color: "#000000",
     lineHeight: 1.4,
   },
-  headerContainer: {
-    alignItems: "center",
-    textAlign: "center",
+  headerWrapper: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
     marginBottom: 14,
     borderBottomWidth: 1,
     borderBottomColor: "#e5e7eb",
     borderBottomStyle: "solid",
     paddingBottom: 10,
   },
+  headerLeftCol: {
+    flex: 1,
+  },
+  headerLogoNameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  socialWrapRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+  },
+  headerRightCol: {
+    marginLeft: 16,
+    alignItems: "flex-end",
+  },
+  socialItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginBottom: 6,
+  },
+  socialText: {
+    fontSize: 8,
+    color: "#6b7280",
+    marginBottom: 0,
+  },
+  socialIconWrapper: {
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  qrCodeIcon: {
+    width: 60,
+    height: 60,
+  },
   logo: {
     width: 48,
     height: 48,
     objectFit: "contain",
-    marginBottom: 6,
+    marginRight: 10,
   },
   clinicName: {
-    fontSize: 16,
+    fontSize: 18,
     fontFamily: "Helvetica-Bold",
     color: "#000000",
-    marginBottom: 3,
   },
   clinicSubText: {
     fontSize: 9,
@@ -142,14 +179,38 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     textAlign: "right",
   },
-  footer: {
+  footerContainer: {
     position: "absolute",
-    bottom: 20,
+    bottom: 24,
     left: 44,
     right: 44,
+    borderTopWidth: 1,
+    borderTopColor: "#e5e7eb",
+    borderTopStyle: "solid",
+    paddingTop: 10,
+  },
+  footerRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    flexWrap: "wrap",
+    gap: 14,
+    marginBottom: 6,
+  },
+  footerItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  footerText: {
+    fontSize: 8,
+    color: "#4b5563",
+    paddingTop: 1.5,
+  },
+  footerDisclaimer: {
     fontSize: 7.5,
     color: "#94a3b8",
     textAlign: "center",
+    marginTop: 4,
   },
 });
 
@@ -194,25 +255,125 @@ function extractGlobalNotes(medications: any[]) {
   return "";
 }
 
+const InstagramIcon = () => (
+  <View style={styles.socialIconWrapper}>
+    <Svg viewBox="0 0 24 24" width={10} height={10}>
+      <Path d="M0 0h24v24H0z" fill="none" />
+      <Rect width="16" height="16" x="4" y="4" rx="4" ry="4" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <Circle cx="12" cy="12" r="3" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M16.5 7.5v.01" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" />
+    </Svg>
+  </View>
+);
+
+const FacebookIcon = () => (
+  <View style={styles.socialIconWrapper}>
+    <Svg viewBox="0 0 24 24" width={10} height={10}>
+      <Path d="M0 0h24v24H0z" fill="none" />
+      <Path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  </View>
+);
+
+const XIcon = () => (
+  <View style={styles.socialIconWrapper}>
+    <Svg viewBox="0 0 24 24" width={10} height={10}>
+      <Path d="M0 0h24v24H0z" fill="none" />
+      <Path d="M4 4l11.73 16h4.27L8.27 4ZM4 20l6.76-6.76M20 4l-6.76 6.76" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  </View>
+);
+
+const GlobeIcon = () => (
+  <View style={styles.socialIconWrapper}>
+    <Svg viewBox="0 0 24 24" width={10} height={10}>
+      <Path d="M0 0h24v24H0z" fill="none" />
+      <Circle cx="12" cy="12" r="10" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M2 12h20" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  </View>
+);
+
+const MapPinIcon = () => (
+  <Svg viewBox="0 0 24 24" width={10} height={10}>
+    <Path d="M0 0h24v24H0z" fill="none" />
+    <Path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <Circle cx="12" cy="10" r="3" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </Svg>
+);
+
+const PhoneIcon = () => (
+  <Svg viewBox="0 0 24 24" width={10} height={10}>
+    <Path d="M0 0h24v24H0z" fill="none" />
+    <Path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </Svg>
+);
+
+const ClockIcon = () => (
+  <Svg viewBox="0 0 24 24" width={10} height={10}>
+    <Path d="M0 0h24v24H0z" fill="none" />
+    <Circle cx="12" cy="12" r="10" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <Path d="M12 6v6l4 2" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </Svg>
+);
+
 export function PrescriptionPdfDocument({ payload, sections }: { payload: PrescriptionPdfPayload; sections: PrescriptionPdfSections }) {
   const globalAdvice = extractGlobalNotes(payload.prescription.medications);
 
   return (
     <Document title={`Prescription - ${payload.patient.name}`}>
       <Page size="A4" style={styles.page}>
-        {/* Centered Branding Header Area */}
-        <View style={styles.headerContainer}>
-          {sections.clinicLogo && payload.clinic.logoUrl ? (
-            <Image src={payload.clinic.logoUrl} style={styles.logo} />
-          ) : null}
-          {sections.clinicName ? <Text style={styles.clinicName}>{payload.clinic.name}</Text> : null}
-          {sections.clinicAddress && payload.clinic.address ? <Text style={styles.clinicSubText}>{payload.clinic.address}</Text> : null}
-          {sections.clinicPhone && payload.clinic.phone ? <Text style={styles.clinicSubText}>Phone: {payload.clinic.phone}</Text> : null}
-          {sections.clinicTimings && payload.clinic.timings.length > 0 ? (
-            <Text style={styles.clinicSubText}>
-              {payload.clinic.timings.map((t) => `${t.days}: ${t.open} - ${t.close}`).join(" | ")}
-            </Text>
-          ) : null}
+        {/* Dynamic Branding Header Area */}
+        <View style={styles.headerWrapper}>
+          {/* LEFT: Logo & Name + Social Row */}
+          <View style={styles.headerLeftCol}>
+            <View style={styles.headerLogoNameRow}>
+              {sections.clinicLogo && payload.clinic.logoUrl ? (
+                <Image src={payload.clinic.logoUrl} style={styles.logo} />
+              ) : null}
+              {sections.clinicName ? (
+                <Text style={styles.clinicName}>{payload.clinic.name}</Text>
+              ) : null}
+            </View>
+
+            <View style={styles.socialWrapRow}>
+              {sections.clinicInstagram && payload.clinic.socialLinks?.instagram && (
+                <View style={styles.socialItem}>
+                  <InstagramIcon />
+                  <Text style={styles.socialText}>{payload.clinic.socialLinks.instagram}</Text>
+                </View>
+              )}
+              {sections.clinicFacebook && payload.clinic.socialLinks?.facebook && (
+                <View style={styles.socialItem}>
+                  <FacebookIcon />
+                  <Text style={styles.socialText}>{payload.clinic.socialLinks.facebook}</Text>
+                </View>
+              )}
+              {sections.clinicX && payload.clinic.socialLinks?.x && (
+                <View style={styles.socialItem}>
+                  <XIcon />
+                  <Text style={styles.socialText}>{payload.clinic.socialLinks.x}</Text>
+                </View>
+              )}
+              {sections.clinicWebsite && payload.clinic.socialLinks?.website && (
+                <View style={styles.socialItem}>
+                  <GlobeIcon />
+                  <Text style={styles.socialText}>{payload.clinic.socialLinks.website.replace(/^https?:\/\//, "")}</Text>
+                </View>
+              )}
+            </View>
+          </View>
+
+          {/* RIGHT: Dynamic QR Code Rendering */}
+          <View style={styles.headerRightCol}>
+            {sections.clinicWebsiteQrCode && payload.clinic.socialLinks?.website ? (
+              <Image
+                src={`https://quickchart.io/qr?size=150&text=${encodeURIComponent(payload.clinic.socialLinks.website)}`}
+                style={styles.qrCodeIcon}
+              />
+            ) : null}
+          </View>
         </View>
 
         {/* Dynamic Patient Details */}
@@ -307,7 +468,7 @@ export function PrescriptionPdfDocument({ payload, sections }: { payload: Prescr
               })}
             </View>
           ) : (
-            <View style={{ py: 6, borderStyle: "dashed", borderWidth: 1, borderColor: "#cbd5e1", borderRadius: 4, textAlign: "center" }}>
+            <View style={{ paddingVertical: 6, borderStyle: "dashed", borderWidth: 1, borderColor: "#cbd5e1", borderRadius: 4, textAlign: "center" }}>
               <Text style={{ color: "#94a3b8", fontSize: 8.5 }}>No prescription items selected for this clinical summary sheet.</Text>
             </View>
           )}
@@ -329,7 +490,34 @@ export function PrescriptionPdfDocument({ payload, sections }: { payload: Prescr
           </View>
         ) : null}
 
-        <Text style={styles.footer}>Clinic ERP Metadata Document System • Authentic Verification Verified Ledger</Text>
+        {/* Structured Footer Element */}
+        <View style={styles.footerContainer} fixed>
+          {(sections.clinicAddress || sections.clinicPhone || sections.clinicTimings) && (
+            <View style={styles.footerRow}>
+              {sections.clinicAddress && payload.clinic.address && (
+                <View style={styles.footerItem}>
+                  <MapPinIcon />
+                  <Text style={styles.footerText}>{payload.clinic.address}</Text>
+                </View>
+              )}
+              {sections.clinicPhone && payload.clinic.phone && (
+                <View style={styles.footerItem}>
+                  <PhoneIcon />
+                  <Text style={styles.footerText}>{payload.clinic.phone}</Text>
+                </View>
+              )}
+              {sections.clinicTimings && payload.clinic.timings.length > 0 && (
+                <View style={styles.footerItem}>
+                  <ClockIcon />
+                  <Text style={styles.footerText}>
+                    {payload.clinic.timings.map((t) => `${t.days}: ${t.open} - ${t.close}`).join(" | ")}
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
+
+        </View>
       </Page>
     </Document>
   );

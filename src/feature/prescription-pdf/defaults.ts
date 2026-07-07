@@ -10,6 +10,11 @@ export const prescriptionPdfSectionLabels: Record<PrescriptionPdfSectionKey, str
   clinicAddress: "Clinic address",
   clinicPhone: "Clinic phone",
   clinicTimings: "Clinic timings",
+  clinicInstagram: "Instagram link",
+  clinicFacebook: "Facebook link",
+  clinicX: "X (Twitter) link",
+  clinicWebsite: "Website link",
+  clinicWebsiteQrCode: "Website QR code",
   patientName: "Patient name",
   patientDobAge: "Patient DOB / age",
   patientGender: "Patient gender",
@@ -31,7 +36,7 @@ export const prescriptionPdfSectionGroups: Array<{
 }> = [
     {
       title: "Clinic header",
-      keys: ["clinicLogo", "clinicName", "clinicAddress", "clinicPhone", "clinicTimings"],
+      keys: ["clinicLogo", "clinicName", "clinicAddress", "clinicPhone", "clinicTimings", "clinicInstagram", "clinicFacebook", "clinicX", "clinicWebsite", "clinicWebsiteQrCode"],
     },
     {
       title: "Patient details",
@@ -50,6 +55,11 @@ export function buildDefaultPrescriptionPdfSections(payload: PrescriptionPdfPayl
     clinicAddress: Boolean(payload.clinic.address),
     clinicPhone: Boolean(payload.clinic.phone),
     clinicTimings: payload.clinic.timings.length > 0,
+    clinicInstagram: Boolean(payload.clinic.socialLinks?.instagram),
+    clinicFacebook: Boolean(payload.clinic.socialLinks?.facebook),
+    clinicX: Boolean(payload.clinic.socialLinks?.x),
+    clinicWebsite: Boolean(payload.clinic.socialLinks?.website),
+    clinicWebsiteQrCode: Boolean(payload.clinic.socialLinks?.website),
     patientName: true,
     patientDobAge: Boolean(payload.patient.dob || payload.patient.ageText),
     patientGender: Boolean(payload.patient.gender),

@@ -6,6 +6,11 @@ export interface IPrescriptionPdfSections {
   clinicAddress: boolean;
   clinicPhone: boolean;
   clinicTimings: boolean;
+  clinicInstagram: boolean;
+  clinicFacebook: boolean;
+  clinicX: boolean;
+  clinicWebsite: boolean;
+  clinicWebsiteQrCode: boolean;
   patientName: boolean;
   patientDobAge: boolean;
   patientGender: boolean;
@@ -37,6 +42,12 @@ export interface IPrescriptionPdf {
       address?: string;
       phone?: string;
       timings?: Array<{ days: string; open: string; close: string }>;
+      socialLinks?: {
+        instagram?: string;
+        facebook?: string;
+        x?: string;
+        website?: string;
+      };
     };
     patient: {
       name: string;
@@ -90,6 +101,11 @@ const PrescriptionPdfSchema = new Schema<IPrescriptionPdf>(
       clinicAddress: { type: Boolean, default: true },
       clinicPhone: { type: Boolean, default: true },
       clinicTimings: { type: Boolean, default: true },
+      clinicInstagram: { type: Boolean, default: true },
+      clinicFacebook: { type: Boolean, default: true },
+      clinicX: { type: Boolean, default: true },
+      clinicWebsite: { type: Boolean, default: true },
+      clinicWebsiteQrCode: { type: Boolean, default: true },
       patientName: { type: Boolean, default: true },
       patientDobAge: { type: Boolean, default: true },
       patientGender: { type: Boolean, default: true },

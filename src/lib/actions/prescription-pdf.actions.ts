@@ -90,6 +90,7 @@ export async function getPrescriptionPdfPayloadAction(
             close: timing.close,
           }))
           : [],
+        socialLinks: clinicSetting?.socialLinks || undefined,
       },
       patient: {
         name: patient.name,

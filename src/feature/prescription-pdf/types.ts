@@ -4,6 +4,11 @@ export interface PrescriptionPdfSections {
   clinicAddress: boolean;
   clinicPhone: boolean;
   clinicTimings: boolean;
+  clinicInstagram: boolean;
+  clinicFacebook: boolean;
+  clinicX: boolean;
+  clinicWebsite: boolean;
+  clinicWebsiteQrCode: boolean;
   patientName: boolean;
   patientDobAge: boolean;
   patientGender: boolean;
@@ -28,6 +33,12 @@ export interface PrescriptionPdfPayload {
     address?: string;
     phone?: string;
     timings: Array<{ days: string; open: string; close: string }>;
+    socialLinks?: {
+      instagram?: string;
+      facebook?: string;
+      x?: string;
+      website?: string;
+    };
   };
   patient: {
     name: string;
