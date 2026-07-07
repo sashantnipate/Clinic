@@ -5,10 +5,10 @@ export interface IPatient {
   // Relationships
   ownerOrgId: Types.ObjectId;       // The internal DB organization that created this record
   sharedWithOrgs: Types.ObjectId[]; // List of other internal DB orgs granted access
-  
+
   // Vendor Lock-In Protection (Binds data to Clerk identity but keeps DB structural integrity)
-  clerkOwnerOrgId: string;          
-  
+  clerkOwnerOrgId: string;
+
   // Patient Demographics
   name: string;
   email: string;
@@ -39,22 +39,22 @@ export interface ICustomSection {
 }
 
 const CustomFieldSchema = new Schema<ICustomField>({
-  id: { 
-    type: String, 
-    required: true 
+  id: {
+    type: String,
+    required: true
   },
-  label: { 
-    type: String, 
-    required: true 
+  label: {
+    type: String,
+    required: true
   },
-  type: { 
-    type: String, 
-    enum: ["text", "number", "textarea", "select"], 
-    required: true 
+  type: {
+    type: String,
+    enum: ["text", "number", "textarea", "select"],
+    required: true
   },
-  required: { 
-    type: Boolean, 
-    default: false 
+  required: {
+    type: Boolean,
+    default: false
   },
   options: [
     { type: String }
@@ -62,66 +62,66 @@ const CustomFieldSchema = new Schema<ICustomField>({
 });
 
 const CustomSectionSchema = new Schema<ICustomSection>({
-  id: { 
-    type: String, 
-    required: true 
+  id: {
+    type: String,
+    required: true
   },
-  title: { 
-    type: String, 
-    required: true 
+  title: {
+    type: String,
+    required: true
   },
   fields: [CustomFieldSchema]
 });
 
 const PatientSchema = new Schema<IPatient>(
   {
-    ownerOrgId: { 
-      type: Schema.Types.ObjectId, 
-      ref: "Organization", 
-      required: true, 
-      index: true 
+    ownerOrgId: {
+      type: Schema.Types.ObjectId,
+      ref: "Organization",
+      required: true,
+      index: true
     },
     sharedWithOrgs: [
-      { 
-        type: Schema.Types.ObjectId, 
-        ref: "Organization" 
+      {
+        type: Schema.Types.ObjectId,
+        ref: "Organization"
       }
     ],
-    clerkOwnerOrgId: { 
-      type: String, 
-      required: true, 
-      index: true 
+    clerkOwnerOrgId: {
+      type: String,
+      required: true,
+      index: true
     },
-    name: { 
-      type: String, 
-      required: true, 
-      index: true 
+    name: {
+      type: String,
+      required: true,
+      index: true
     },
-    email: { 
-      type: String, 
-      required: true 
+    email: {
+      type: String,
+      required: true
     },
-    phone: { 
-      type: String, 
-      required: true 
+    phone: {
+      type: String,
+      required: true
     },
-    dob: { 
-      type: Date, 
-      required: true 
+    dob: {
+      type: Date,
+      required: true
     },
-    gender: { 
-      type: String, 
-      enum: ["male", "female", "other"], 
-      required: true 
+    gender: {
+      type: String,
+      enum: ["male", "female", "other"],
+      required: true
     },
-    address: { 
-      type: String 
+    address: {
+      type: String
     },
     customSections: [CustomSectionSchema],
-    customData: { 
-      type: Schema.Types.Mixed, 
-      default: {}, 
-      required: true 
+    customData: {
+      type: Schema.Types.Mixed,
+      default: {},
+      required: true
     }
   },
   { timestamps: true }
@@ -129,5 +129,8 @@ const PatientSchema = new Schema<IPatient>(
 
 // Compound index for super fast queries scoped to a clinic
 PatientSchema.index({ ownerOrgId: 1, name: 1 });
+PatientSchema.index({ ownerOrgId: 1, email: 1 });
+PatientSchema.index({ ownerOrgId: 1, phone: 1 });
+PatientSchema.index({ ownerOrgId: 1, createdAt: -1 });
 
 export const Patient = models.Patient || model<IPatient>("Patient", PatientSchema);

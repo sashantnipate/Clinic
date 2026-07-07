@@ -11,21 +11,21 @@ import { Input as ShadcnInput } from "@/components/ui/input";
 import { Label as ShadcnLabel } from "@/components/ui/label";
 import { Button as ShadcnButton } from "@/components/ui/button";
 
-import { usePatientsTable } from "./hooks/use-patients-table";
 import { TableFilters, NameHeaderFilter, MetricsHeaderFilter } from "./components/table-filters";
 import { RowActions } from "./components/row-actions";
 import { TablePagination } from "./components/table-pagination";
 import { Patient } from "./types";
 import Link from "next/link";
+import { Loader2 } from "lucide-react";
 
 interface PatientsTableProps {
-  patients: Patient[];
+  tableState: any; // We can use ReturnType<typeof usePatientsTable> if we imported, but any works for refactoring fast
   onUpdatePatient: (updatedPatient: Patient) => void;
   onDeletePatient: (id: string) => void;
 }
 
-export function PatientsTable({ patients, onUpdatePatient, onDeletePatient }: PatientsTableProps) {
-  const t = usePatientsTable(patients);
+export function PatientsTable({ tableState: t, onUpdatePatient, onDeletePatient }: PatientsTableProps) {
+
 
   return (
     <div className="w-full space-y-4">
@@ -53,12 +53,17 @@ export function PatientsTable({ patients, onUpdatePatient, onDeletePatient }: Pa
 
       {/* 📱 Mobile Responsive Cards Display Grid */}
       <div className="grid grid-cols-1 gap-3 md:hidden">
-        {t.paginatedPatients.length === 0 ? (
+        {t.isLoading ? (
+          <div className="rounded-md border p-8 bg-card flex flex-col items-center justify-center space-y-2 text-muted-foreground shadow-xs">
+            <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            <p className="text-xs font-medium">Fetching records...</p>
+          </div>
+        ) : t.paginatedPatients.length === 0 ? (
           <div className="rounded-md border p-8 text-center text-muted-foreground text-sm bg-card">
             No matching patient records found.
           </div>
         ) : (
-          t.paginatedPatients.map((patient) => {
+          t.paginatedPatients.map((patient: Patient) => {
             const age = t.parseAge(patient.dob);
             const isSelected = t.selectedIds.includes(patient.id);
 
@@ -168,10 +173,10 @@ export function PatientsTable({ patients, onUpdatePatient, onDeletePatient }: Pa
                       </PopoverTrigger>
                       <PopoverContent className="w-60 p-3 space-y-2" align="start">
                         <ShadcnLabel className="text-xs font-medium">Search Email or Phone</ShadcnLabel>
-                        <ShadcnInput 
-                          placeholder="Type email or digits..." 
-                          value={t.contactFilter} 
-                          onChange={(e) => { t.setContactFilter(e.target.value); t.setCurrentPage(1); }} 
+                        <ShadcnInput
+                          placeholder="Type email or digits..."
+                          value={t.contactFilter}
+                          onChange={(e) => { t.setContactFilter(e.target.value); t.setCurrentPage(1); }}
                           className="h-8 text-xs"
                         />
                         {t.contactFilter && (
@@ -197,10 +202,10 @@ export function PatientsTable({ patients, onUpdatePatient, onDeletePatient }: Pa
                       </PopoverTrigger>
                       <PopoverContent className="w-60 p-3 space-y-2" align="start">
                         <ShadcnLabel className="text-xs font-medium">Search exact date string</ShadcnLabel>
-                        <ShadcnInput 
-                          placeholder="e.g. 01/07/2026" 
-                          value={t.regDateFilter} 
-                          onChange={(e) => { t.setRegDateFilter(e.target.value); t.setCurrentPage(1); }} 
+                        <ShadcnInput
+                          placeholder="e.g. 01/07/2026"
+                          value={t.regDateFilter}
+                          onChange={(e) => { t.setRegDateFilter(e.target.value); t.setCurrentPage(1); }}
                           className="h-8 text-xs"
                         />
                         {t.regDateFilter && (
@@ -219,14 +224,23 @@ export function PatientsTable({ patients, onUpdatePatient, onDeletePatient }: Pa
           </TableHeader>
 
           <TableBody>
-            {t.paginatedPatients.length === 0 ? (
+            {t.isLoading ? (
+              <TableRow>
+                <TableCell colSpan={6} className="h-32 text-center">
+                  <div className="flex flex-col items-center justify-center space-y-2 text-muted-foreground">
+                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                    <p className="text-xs font-medium">Fetching patient records...</p>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ) : t.paginatedPatients.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} className="h-24 text-center text-muted-foreground text-sm">
                   No matching patients found within specified metrics.
                 </TableCell>
               </TableRow>
             ) : (
-              t.paginatedPatients.map((patient) => {
+              t.paginatedPatients.map((patient: Patient) => {
                 const age = t.parseAge(patient.dob);
                 const isSelected = t.selectedIds.includes(patient.id);
 
@@ -239,11 +253,11 @@ export function PatientsTable({ patients, onUpdatePatient, onDeletePatient }: Pa
                         aria-label="Select row selection state"
                       />
                     </TableCell>
-                      <TableCell className="py-3 font-semibold text-foreground tracking-tight">
-                        <Link href={`/patients/${patient.id}`} className="hover:text-primary hover:underline transition-colors cursor-pointer">
-                          {patient.name}
-                        </Link>
-                      </TableCell>
+                    <TableCell className="py-3 font-semibold text-foreground tracking-tight">
+                      <Link href={`/patients/${patient.id}`} className="hover:text-primary hover:underline transition-colors cursor-pointer">
+                        {patient.name}
+                      </Link>
+                    </TableCell>
                     {t.visibleColumns.genderAge && (
                       <TableCell className="py-3 capitalize text-muted-foreground text-sm">
                         {patient.gender}{" "}
@@ -284,7 +298,7 @@ export function PatientsTable({ patients, onUpdatePatient, onDeletePatient }: Pa
       {/* Pagination Footer Controls Component Block */}
       <TablePagination
         selectedVisibleCount={t.selectedVisibleCount}
-        totalFilteredRecords={t.processedPatients.length}
+        totalFilteredRecords={t.totalRecords}
         currentPage={t.currentPage}
         setCurrentPage={t.setCurrentPage}
         totalPages={t.totalPages}

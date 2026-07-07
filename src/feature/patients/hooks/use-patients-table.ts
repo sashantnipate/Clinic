@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Patient, VisibleColumns } from "../types";
+import { getPatients } from "@/lib/actions/patient.actions";
 
-export function usePatientsTable(initialPatients: Patient[], itemsPerPage = 10) {
+export function usePatientsTable(itemsPerPage = 10) {
   const [globalSearch, setGlobalSearch] = useState("");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc" | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -23,6 +24,79 @@ export function usePatientsTable(initialPatients: Patient[], itemsPerPage = 10) 
     regDate: true,
   });
 
+  const [patients, setPatients] = useState<Patient[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [totalRecords, setTotalRecords] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [refreshTick, setRefreshTick] = useState(0); // Optional force refresh
+
+  const triggerRefresh = () => setRefreshTick(prev => prev + 1);
+
+  useEffect(() => {
+    const fetchPatients = async () => {
+      setIsLoading(true);
+      try {
+        const token = localStorage.getItem("clinic_jwt") || "";
+        const result = await getPatients(token, {
+          page: currentPage,
+          limit: itemsPerPage,
+          globalSearch,
+          nameFilter,
+          genderFilter,
+          ageCondition,
+          ageValue,
+          contactFilter,
+          regDateFilter,
+          sortOrder,
+        });
+
+        if (result.success) {
+          const formattedPatients = result.patients.map((p: any) => ({
+            id: p._id,
+            name: p.name,
+            email: p.email,
+            phone: p.phone,
+            dob: p.dob,
+            gender: p.gender,
+            createdAt: new Date(p.createdAt).toLocaleDateString("en-GB"),
+            customSections: p.customSections,
+            customData: p.customData
+          }));
+          setPatients(formattedPatients);
+          setTotalRecords(result.totalRecords || 0);
+          setTotalPages(result.totalPages || 1);
+        } else {
+          setPatients([]);
+          setTotalRecords(0);
+          setTotalPages(1);
+        }
+      } catch (err) {
+        console.error("Failed to load patients", err);
+        setPatients([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    const delayDebounceFn = setTimeout(() => {
+      fetchPatients();
+    }, 400);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [
+    currentPage,
+    itemsPerPage,
+    globalSearch,
+    nameFilter,
+    genderFilter,
+    ageCondition,
+    ageValue,
+    contactFilter,
+    regDateFilter,
+    sortOrder,
+    refreshTick
+  ]);
+
   const parseAge = (dobString: string) => {
     if (!dobString) return null;
     let birthYear = new Date(dobString).getFullYear();
@@ -35,56 +109,7 @@ export function usePatientsTable(initialPatients: Patient[], itemsPerPage = 10) 
     return new Date().getFullYear() - birthYear;
   };
 
-  const processedPatients = useMemo(() => {
-    let result = initialPatients.filter((p) => {
-      if (!p) return false;
-      const name = p.name?.toLowerCase() || "";
-      const email = p.email?.toLowerCase() || "";
-      const phone = p.phone || "";
-      const createdAt = p.createdAt || "";
-      const query = globalSearch.toLowerCase();
-
-      const matchesGlobal = name.includes(query) || email.includes(query) || phone.includes(query);
-      const matchesNameColumn = name.includes(nameFilter.toLowerCase());
-      const matchesGenderColumn = genderFilter === "all" || (p.gender?.toLowerCase() || "") === genderFilter;
-      const matchesContactColumn = email.includes(contactFilter.toLowerCase()) || phone.includes(contactFilter);
-      const matchesRegDateColumn = createdAt.includes(regDateFilter);
-
-      let matchesAgeCondition = true;
-      if (ageCondition !== "none" && ageValue) {
-        const patientAge = parseAge(p.dob);
-        const targetAge = parseInt(ageValue, 10);
-        if (patientAge !== null && !isNaN(targetAge)) {
-          if (ageCondition === "gt") matchesAgeCondition = patientAge > targetAge;
-          if (ageCondition === "lt") matchesAgeCondition = patientAge < targetAge;
-          if (ageCondition === "eq") matchesAgeCondition = patientAge === targetAge;
-        } else {
-          matchesAgeCondition = false;
-        }
-      }
-
-      return matchesGlobal && matchesNameColumn && matchesGenderColumn && matchesAgeCondition && matchesContactColumn && matchesRegDateColumn;
-    });
-
-    if (sortOrder) {
-      result.sort((a, b) => {
-        if (sortOrder === "asc") return (a.name || "").localeCompare(b.name || "");
-        return (b.name || "").localeCompare(a.name || "");
-      });
-    }
-
-    return result;
-  }, [initialPatients, globalSearch, sortOrder, nameFilter, genderFilter, ageCondition, ageValue, contactFilter, regDateFilter]);
-
-  const totalPages = Math.max(Math.ceil(processedPatients.length / itemsPerPage), 1);
-  const activePage = currentPage > totalPages ? totalPages : currentPage;
-
-  const paginatedPatients = useMemo(() => {
-    const startIdx = (activePage - 1) * itemsPerPage;
-    return processedPatients.slice(startIdx, startIdx + itemsPerPage);
-  }, [processedPatients, activePage, itemsPerPage]);
-
-  const currentFilteredIds = processedPatients.map((p) => p.id);
+  const currentFilteredIds = patients.map((p) => p.id);
   const selectedVisibleCount = currentFilteredIds.filter((id) => selectedIds.includes(id)).length;
   const isAllSelected = currentFilteredIds.length > 0 && selectedVisibleCount === currentFilteredIds.length;
   const isSomeSelected = selectedVisibleCount > 0 && selectedVisibleCount < currentFilteredIds.length;
@@ -104,7 +129,7 @@ export function usePatientsTable(initialPatients: Patient[], itemsPerPage = 10) 
   return {
     globalSearch, setGlobalSearch,
     sortOrder, setSortOrder,
-    currentPage: activePage, setCurrentPage, totalPages,
+    currentPage, setCurrentPage, totalPages, totalRecords,
     nameFilter, setNameFilter,
     genderFilter, setGenderFilter,
     ageCondition, setAgeCondition,
@@ -113,7 +138,10 @@ export function usePatientsTable(initialPatients: Patient[], itemsPerPage = 10) 
     regDateFilter, setRegDateFilter,
     visibleColumns, setVisibleColumns,
     selectedIds, setSelectedIds, isAllSelected, isSomeSelected, selectedVisibleCount,
-    processedPatients, paginatedPatients,
+    paginatedPatients: patients,
+    isLoading,
+    triggerRefresh,
+    setPatients,
     handleToggleRow, handleToggleAll, parseAge,
   };
 }

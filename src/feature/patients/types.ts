@@ -13,3 +13,16 @@ export interface VisibleColumns {
   contactInfo: boolean;
   regDate: boolean;
 }
+
+export interface GetPatientsParams {
+  page?: number;
+  limit?: number;
+  globalSearch?: string;
+  nameFilter?: string;
+  genderFilter?: string;
+  ageCondition?: "gt" | "lt" | "eq" | "none";
+  ageValue?: string;
+  contactFilter?: string;
+  regDateFilter?: string;
+  sortOrder?: "asc" | "desc" | null;
+}

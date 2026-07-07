@@ -31,7 +31,7 @@ export async function createPatientRecord(token: string, patientData: any) {
   }
 }
 
-export async function getPatients(token: string) {
+export async function getPatients(token: string, params: any = {}) {
   try {
     const session = await verifyJWTString(token);
     if (!session || !session.ownerOrgId) {
@@ -42,16 +42,115 @@ export async function getPatients(token: string) {
 
     const currentOrgObjectId = new mongoose.Types.ObjectId(session.ownerOrgId);
 
-    const patients = await Patient.find({
+    const {
+      page = 1,
+      limit = 10,
+      globalSearch = "",
+      nameFilter = "",
+      genderFilter = "all",
+      ageCondition = "none",
+      ageValue = "",
+      contactFilter = "",
+      regDateFilter = "",
+      sortOrder = null,
+    } = params;
+
+    const query: any = {
       $or: [
         { ownerOrgId: currentOrgObjectId },
         { sharedWithOrgs: currentOrgObjectId }
       ]
-    }).sort({ createdAt: -1 }).lean();
+    };
+
+    const filters: any[] = [];
+
+    if (globalSearch) {
+      filters.push({
+        $or: [
+          { name: { $regex: globalSearch, $options: "i" } },
+          { email: { $regex: globalSearch, $options: "i" } },
+          { phone: { $regex: globalSearch, $options: "i" } },
+        ]
+      });
+    }
+
+    if (nameFilter) {
+      filters.push({ name: { $regex: nameFilter, $options: "i" } });
+    }
+
+    if (genderFilter && genderFilter !== "all") {
+      filters.push({ gender: genderFilter.toLowerCase() });
+    }
+
+    if (contactFilter) {
+      filters.push({
+        $or: [
+          { email: { $regex: contactFilter, $options: "i" } },
+          { phone: { $regex: contactFilter, $options: "i" } }
+        ]
+      });
+    }
+
+    if (regDateFilter) {
+      const parts = regDateFilter.split("/");
+      if (parts.length === 3) {
+        const day = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10) - 1;
+        const year = parseInt(parts[2], 10);
+        if (!isNaN(day) && !isNaN(month) && !isNaN(year)) {
+          const startOfDay = new Date(year, month, day);
+          const endOfDay = new Date(year, month, day, 23, 59, 59, 999);
+          filters.push({
+            createdAt: { $gte: startOfDay, $lte: endOfDay }
+          });
+        }
+      }
+    }
+
+    if (ageCondition !== "none" && ageValue) {
+      const targetAge = parseInt(ageValue, 10);
+      if (!isNaN(targetAge)) {
+        const todayYear = new Date().getFullYear();
+        const targetYear = todayYear - targetAge;
+
+        const startOfYear = new Date(targetYear, 0, 1);
+        const endOfYear = new Date(targetYear, 11, 31, 23, 59, 59, 999);
+
+        if (ageCondition === "eq") {
+          filters.push({ dob: { $gte: startOfYear, $lte: endOfYear } });
+        } else if (ageCondition === "gt") {
+          filters.push({ dob: { $lt: startOfYear } });
+        } else if (ageCondition === "lt") {
+          filters.push({ dob: { $gt: endOfYear } });
+        }
+      }
+    }
+
+    if (filters.length > 0) {
+      query.$and = filters;
+    }
+
+    const sortOpt: any = {};
+    if (sortOrder) {
+      sortOpt.name = sortOrder === "asc" ? 1 : -1;
+    } else {
+      sortOpt.createdAt = -1;
+    }
+
+    const skipIndex = (page - 1) * limit;
+
+    const [patients, totalRecords] = await Promise.all([
+      Patient.find(query).sort(sortOpt).skip(skipIndex).limit(limit).lean(),
+      Patient.countDocuments(query)
+    ]);
+
+    const totalPages = Math.max(Math.ceil(totalRecords / limit), 1);
 
     return {
       success: true,
-      patients: JSON.parse(JSON.stringify(patients))
+      patients: JSON.parse(JSON.stringify(patients)),
+      totalRecords,
+      totalPages
     };
   } catch (error: any) {
     return { success: false, error: error.message };
