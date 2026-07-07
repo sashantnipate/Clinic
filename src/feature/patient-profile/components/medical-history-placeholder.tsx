@@ -131,7 +131,7 @@ export function MedicalHistoryPlaceholder() {
       }
 
       const metaEl = metadataRefs.current[node.nodeId];
-      if (metaEl) {
+      if (metaEl && metaEl.offsetWidth > 0) {
         const metaRect = metaEl.getBoundingClientRect();
         metadataMap[node.nodeId] = {
           x: metaRect.left - contentRect.left,
@@ -204,19 +204,27 @@ export function MedicalHistoryPlaceholder() {
     calculatePaths();
     const timer = setTimeout(calculatePaths, 250);
     window.addEventListener("resize", calculatePaths);
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isFullscreen) {
+        setIsFullscreen(false);
+        setTimeout(calculatePaths, 100);
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+
     return () => {
       window.removeEventListener("resize", calculatePaths);
+      document.removeEventListener("keydown", handleKeyDown);
       clearTimeout(timer);
     };
   }, [timeline, isFullscreen, calculatePaths]);
 
   const toggleFullscreen = () => {
-    if (!panelRef.current) return;
-    if (!document.fullscreenElement) {
-      panelRef.current.requestFullscreen().then(() => setIsFullscreen(true)).catch(console.error);
-    } else {
-      document.exitFullscreen().then(() => setIsFullscreen(false));
-    }
+    setIsFullscreen((prev) => {
+      setTimeout(calculatePaths, 100);
+      return !prev;
+    });
   };
 
   const displayTimeline = [...timeline].reverse();
@@ -319,7 +327,7 @@ export function MedicalHistoryPlaceholder() {
 
                   <div
                     ref={(el) => { metadataRefs.current[node.nodeId] = el; }}
-                    className="absolute right-4 hidden md:flex flex-col text-right text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80 select-none bg-background px-2 py-0.5 rounded shadow-3xs border border-muted/50 z-10"
+                    className="absolute right-1 md:right-4 flex flex-col text-right text-[9px] md:text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80 select-none bg-background px-1.5 md:px-2 py-0.5 rounded shadow-3xs border border-muted/50 z-10"
                   >
                     <span>{node.date}</span>
                     <span className="font-normal text-muted-foreground/50 lowercase text-[9px]">{node.time}</span>

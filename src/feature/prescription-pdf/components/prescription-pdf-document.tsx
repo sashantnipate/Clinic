@@ -48,12 +48,13 @@ const styles = StyleSheet.create({
   socialText: {
     fontSize: 8,
     color: "#6b7280",
-    marginBottom: 0,
+    paddingTop: 2.5,
   },
-  socialIconWrapper: {
+  svgIcon: {
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
+    marginBottom: 1.5,
   },
   qrCodeIcon: {
     width: 60,
@@ -204,7 +205,7 @@ const styles = StyleSheet.create({
   footerText: {
     fontSize: 8,
     color: "#4b5563",
-    paddingTop: 1.5,
+    paddingTop: 2.5,
   },
   footerDisclaimer: {
     fontSize: 7.5,
@@ -256,7 +257,7 @@ function extractGlobalNotes(medications: any[]) {
 }
 
 const InstagramIcon = () => (
-  <View style={styles.socialIconWrapper}>
+  <View style={styles.svgIcon}>
     <Svg viewBox="0 0 24 24" width={10} height={10}>
       <Path d="M0 0h24v24H0z" fill="none" />
       <Rect width="16" height="16" x="4" y="4" rx="4" ry="4" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -267,7 +268,7 @@ const InstagramIcon = () => (
 );
 
 const FacebookIcon = () => (
-  <View style={styles.socialIconWrapper}>
+  <View style={styles.svgIcon}>
     <Svg viewBox="0 0 24 24" width={10} height={10}>
       <Path d="M0 0h24v24H0z" fill="none" />
       <Path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -276,7 +277,7 @@ const FacebookIcon = () => (
 );
 
 const XIcon = () => (
-  <View style={styles.socialIconWrapper}>
+  <View style={styles.svgIcon}>
     <Svg viewBox="0 0 24 24" width={10} height={10}>
       <Path d="M0 0h24v24H0z" fill="none" />
       <Path d="M4 4l11.73 16h4.27L8.27 4ZM4 20l6.76-6.76M20 4l-6.76 6.76" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -285,7 +286,7 @@ const XIcon = () => (
 );
 
 const GlobeIcon = () => (
-  <View style={styles.socialIconWrapper}>
+  <View style={styles.svgIcon}>
     <Svg viewBox="0 0 24 24" width={10} height={10}>
       <Path d="M0 0h24v24H0z" fill="none" />
       <Circle cx="12" cy="12" r="10" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -296,26 +297,32 @@ const GlobeIcon = () => (
 );
 
 const MapPinIcon = () => (
-  <Svg viewBox="0 0 24 24" width={10} height={10}>
-    <Path d="M0 0h24v24H0z" fill="none" />
-    <Path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-    <Circle cx="12" cy="10" r="3" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-  </Svg>
+  <View style={styles.svgIcon}>
+    <Svg viewBox="0 0 24 24" width={10} height={10}>
+      <Path d="M0 0h24v24H0z" fill="none" />
+      <Path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <Circle cx="12" cy="10" r="3" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  </View>
 );
 
 const PhoneIcon = () => (
-  <Svg viewBox="0 0 24 24" width={10} height={10}>
-    <Path d="M0 0h24v24H0z" fill="none" />
-    <Path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-  </Svg>
+  <View style={styles.svgIcon}>
+    <Svg viewBox="0 0 24 24" width={10} height={10}>
+      <Path d="M0 0h24v24H0z" fill="none" />
+      <Path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  </View>
 );
 
 const ClockIcon = () => (
-  <Svg viewBox="0 0 24 24" width={10} height={10}>
-    <Path d="M0 0h24v24H0z" fill="none" />
-    <Circle cx="12" cy="12" r="10" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-    <Path d="M12 6v6l4 2" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-  </Svg>
+  <View style={styles.svgIcon}>
+    <Svg viewBox="0 0 24 24" width={10} height={10}>
+      <Path d="M0 0h24v24H0z" fill="none" />
+      <Circle cx="12" cy="12" r="10" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M12 6v6l4 2" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  </View>
 );
 
 export function PrescriptionPdfDocument({ payload, sections }: { payload: PrescriptionPdfPayload; sections: PrescriptionPdfSections }) {
