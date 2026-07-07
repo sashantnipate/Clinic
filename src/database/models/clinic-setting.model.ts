@@ -1,6 +1,5 @@
 import { Schema, model, models, Types } from "mongoose";
-
-export interface IClinicTiming {
+import type { PrescriptionPdfSections } from "@/feature/prescription-pdf/types"; export interface IClinicTiming {
   days: string;  // e.g., "Mon - Fri"
   open: string;  // e.g., "08:00 AM"
   close: string; // e.g., "06:00 PM"
@@ -18,6 +17,7 @@ export interface IClinicSetting {
     x?: string;
     website?: string;
   };
+  prescriptionPdfSettings?: PrescriptionPdfSections;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -45,7 +45,8 @@ const ClinicSettingSchema = new Schema<IClinicSetting>(
       facebook: { type: String },
       x: { type: String },
       website: { type: String }
-    }
+    },
+    prescriptionPdfSettings: { type: Schema.Types.Mixed }
   },
   { timestamps: true }
 );

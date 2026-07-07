@@ -91,6 +91,7 @@ export async function getPrescriptionPdfPayloadAction(
           }))
           : [],
         socialLinks: clinicSetting?.socialLinks || undefined,
+        defaultPdfSettings: clinicSetting?.prescriptionPdfSettings || undefined,
       },
       patient: {
         name: patient.name,

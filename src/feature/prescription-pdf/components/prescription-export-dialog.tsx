@@ -121,8 +121,8 @@ export function PrescriptionExportDialog({
           </div>
         ) : payload && sections ? (
           <div className="grid min-h-0 flex-1 grid-cols-1 gap-6 lg:grid-cols-[340px_1fr]">
-            <div className="flex min-h-0 flex-col rounded-xl border bg-card shadow-3xs">
-              <div className="flex items-center justify-between border-b p-4 bg-muted/20">
+            <div className="flex min-h-0 flex-col rounded-xl border bg-card shadow-3xs overflow-hidden h-[540px]">
+              <div className="flex items-center justify-between border-b p-4 bg-muted/20 shrink-0">
                 <div>
                   <p className="text-xs font-bold uppercase tracking-wide text-foreground">Visible Fields</p>
                   <p className="text-[11px] text-muted-foreground">Omitted fields are disabled</p>
@@ -135,7 +135,7 @@ export function PrescriptionExportDialog({
                 </div>
               </div>
 
-              <ScrollArea className="flex-1 h-[520px]">
+              <ScrollArea className="flex-1 min-h-0">
                 <div className="space-y-5 p-4">
                   <Accordion
                     type="multiple"

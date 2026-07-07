@@ -16,6 +16,7 @@ interface UpdateClinicParams {
     x?: string;
     website?: string;
   };
+  prescriptionPdfSettings?: any;
 }
 
 export async function updateClinicSettingAction(token: string, params: UpdateClinicParams) {
@@ -41,6 +42,7 @@ export async function updateClinicSettingAction(token: string, params: UpdateCli
         phone: params.phone,
         timings: params.timings,
         socialLinks: params.socialLinks,
+        prescriptionPdfSettings: params.prescriptionPdfSettings,
       },
       { new: true, upsert: true }
     );

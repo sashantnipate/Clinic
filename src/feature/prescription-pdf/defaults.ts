@@ -48,7 +48,7 @@ export const prescriptionPdfSectionGroups: Array<{
     },
   ];
 
-export function buildDefaultPrescriptionPdfSections(payload: PrescriptionPdfPayload): PrescriptionPdfSections {
+function getAvailablePrescriptionPdfSections(payload: PrescriptionPdfPayload): PrescriptionPdfSections {
   return {
     clinicLogo: Boolean(payload.clinic.logoUrl),
     clinicName: true,
@@ -76,11 +76,31 @@ export function buildDefaultPrescriptionPdfSections(payload: PrescriptionPdfPayl
   };
 }
 
+export function buildDefaultPrescriptionPdfSections(payload: PrescriptionPdfPayload): PrescriptionPdfSections {
+  const available = getAvailablePrescriptionPdfSections(payload);
+
+  if (payload.clinic.defaultPdfSettings) {
+    // If clinic has a saved preference, intersect it with data availability
+    const preferred = payload.clinic.defaultPdfSettings;
+    const result = { ...preferred };
+    // Turn off anything that isn't actually available in payload
+    for (const key in result) {
+      if (!available[key as keyof PrescriptionPdfSections]) {
+        result[key as keyof PrescriptionPdfSections] = false;
+      }
+    }
+    return result;
+  }
+
+  // Fallback if clinic has not saved any preferences
+  return available;
+}
+
 export function isPrescriptionPdfSectionAvailable(
   key: PrescriptionPdfSectionKey,
   payload: PrescriptionPdfPayload
 ) {
-  const defaults = buildDefaultPrescriptionPdfSections(payload);
+  const available = getAvailablePrescriptionPdfSections(payload);
   if (key === "clinicName" || key === "patientName" || key === "encounterDate" || key === "encounterDoctor" || key === "encounterDepartment") return true;
-  return defaults[key];
+  return available[key];
 }

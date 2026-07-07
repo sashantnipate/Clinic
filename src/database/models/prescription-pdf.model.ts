@@ -1,30 +1,6 @@
 import { Schema, model, models, Types } from "mongoose";
 
-export interface IPrescriptionPdfSections {
-  clinicLogo: boolean;
-  clinicName: boolean;
-  clinicAddress: boolean;
-  clinicPhone: boolean;
-  clinicTimings: boolean;
-  clinicInstagram: boolean;
-  clinicFacebook: boolean;
-  clinicX: boolean;
-  clinicWebsite: boolean;
-  clinicWebsiteQrCode: boolean;
-  patientName: boolean;
-  patientDobAge: boolean;
-  patientGender: boolean;
-  patientPhone: boolean;
-  patientEmail: boolean;
-  patientAddress: boolean;
-  encounterDate: boolean;
-  encounterDoctor: boolean;
-  encounterDepartment: boolean;
-  complaint: boolean;
-  notes: boolean;
-  medications: boolean;
-  followupDate: boolean;
-}
+
 
 export interface IPrescriptionPdf {
   _id: string;
@@ -34,7 +10,6 @@ export interface IPrescriptionPdf {
   prescriptionId?: Types.ObjectId;
   generatedByUserId: Types.ObjectId;
   generatedByName: string;
-  selectedSections: IPrescriptionPdfSections;
   snapshot: {
     clinic: {
       name: string;
@@ -95,31 +70,6 @@ const PrescriptionPdfSchema = new Schema<IPrescriptionPdf>(
     prescriptionId: { type: Schema.Types.ObjectId, ref: "Prescription" },
     generatedByUserId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
     generatedByName: { type: String, required: true, trim: true },
-    selectedSections: {
-      clinicLogo: { type: Boolean, default: true },
-      clinicName: { type: Boolean, default: true },
-      clinicAddress: { type: Boolean, default: true },
-      clinicPhone: { type: Boolean, default: true },
-      clinicTimings: { type: Boolean, default: true },
-      clinicInstagram: { type: Boolean, default: true },
-      clinicFacebook: { type: Boolean, default: true },
-      clinicX: { type: Boolean, default: true },
-      clinicWebsite: { type: Boolean, default: true },
-      clinicWebsiteQrCode: { type: Boolean, default: true },
-      patientName: { type: Boolean, default: true },
-      patientDobAge: { type: Boolean, default: true },
-      patientGender: { type: Boolean, default: true },
-      patientPhone: { type: Boolean, default: true },
-      patientEmail: { type: Boolean, default: true },
-      patientAddress: { type: Boolean, default: true },
-      encounterDate: { type: Boolean, default: true },
-      encounterDoctor: { type: Boolean, default: true },
-      encounterDepartment: { type: Boolean, default: true },
-      complaint: { type: Boolean, default: true },
-      notes: { type: Boolean, default: true },
-      medications: { type: Boolean, default: true },
-      followupDate: { type: Boolean, default: true },
-    },
     snapshot: { type: Schema.Types.Mixed, required: true },
     file: {
       url: { type: String },

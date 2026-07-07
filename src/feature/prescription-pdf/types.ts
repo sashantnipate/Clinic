@@ -39,6 +39,7 @@ export interface PrescriptionPdfPayload {
       x?: string;
       website?: string;
     };
+    defaultPdfSettings?: PrescriptionPdfSections;
   };
   patient: {
     name: string;
