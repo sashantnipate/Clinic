@@ -85,10 +85,10 @@ export async function getPrescriptionPdfPayloadAction(
         phone: clinicSetting?.phone || undefined,
         timings: clinicSetting?.timings
           ? (clinicSetting.timings as ClinicTimingPayload[]).map((timing) => ({
-              days: timing.days,
-              open: timing.open,
-              close: timing.close,
-            }))
+            days: timing.days,
+            open: timing.open,
+            close: timing.close,
+          }))
           : [],
       },
       patient: {
@@ -114,11 +114,11 @@ export async function getPrescriptionPdfPayloadAction(
         id: prescription?._id?.toString(),
         medications: prescription?.medications
           ? prescription.medications.map((medication) => ({
-              name: medication.name,
-              frequency: medication.frequency,
-              duration: medication.duration,
-              instructions: medication.instructions,
-            }))
+            name: medication.name,
+            frequency: medication.frequency,
+            duration: medication.duration,
+            instructions: medication.instructions,
+          }))
           : [],
       },
     };

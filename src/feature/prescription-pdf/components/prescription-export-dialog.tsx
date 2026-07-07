@@ -3,6 +3,12 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, FileText, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
@@ -94,7 +100,7 @@ export function PrescriptionExportDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       {/* Forcing explicit layout sizes directly using inline styles to override hardcoded component styles */}
-      <DialogContent 
+      <DialogContent
         className="flex max-h-[92vh] flex-col gap-4 overflow-hidden p-6"
         style={{ maxWidth: "1240px", width: "94vw" }}
       >
@@ -131,30 +137,47 @@ export function PrescriptionExportDialog({
 
               <ScrollArea className="flex-1 h-[520px]">
                 <div className="space-y-5 p-4">
-                  {prescriptionPdfSectionGroups.map((group) => (
-                    <div key={group.title} className="space-y-2.5">
-                      <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{group.title}</p>
-                      <div className="space-y-2">
-                        {group.keys.map((key) => {
-                          const disabled = unavailableSections.has(key);
-                          return (
-                            <label
-                              key={key}
-                              className="flex min-h-8 items-center gap-3 rounded-lg border bg-background px-3 py-2 text-xs transition-colors hover:bg-muted/30 cursor-pointer has-disabled:opacity-40 has-disabled:cursor-not-allowed"
-                            >
-                              <Checkbox
-                                checked={sections[key]}
-                                disabled={disabled}
-                                onCheckedChange={(checked) => updateSection(key, checked === true)}
-                              />
-                              <span className="font-medium text-foreground/90">{prescriptionPdfSectionLabels[key]}</span>
-                            </label>
-                          );
-                        })}
-                      </div>
-                      <Separator className="mt-4" />
-                    </div>
-                  ))}
+                  <Accordion
+                    type="multiple"
+                    defaultValue={prescriptionPdfSectionGroups.map((g) => g.title)}
+                    className="w-full space-y-4"
+                  >
+                    {prescriptionPdfSectionGroups.map((group) => (
+                      <AccordionItem
+                        key={group.title}
+                        value={group.title}
+                        className="rounded-xl border bg-card px-4 py-1 shadow-2xs border-stone-200"
+                      >
+                        <AccordionTrigger className="hover:no-underline py-2.5">
+                          <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                            {group.title}
+                          </span>
+                        </AccordionTrigger>
+                        <AccordionContent className="pt-1 pb-3">
+                          <div className="space-y-2">
+                            {group.keys.map((key) => {
+                              const disabled = unavailableSections.has(key);
+                              return (
+                                <label
+                                  key={key}
+                                  className="flex min-h-8 items-center gap-3 rounded-lg border bg-background px-3 py-2 text-xs transition-colors hover:bg-muted/30 cursor-pointer has-disabled:opacity-40 has-disabled:cursor-not-allowed"
+                                >
+                                  <Checkbox
+                                    checked={sections[key]}
+                                    disabled={disabled}
+                                    onCheckedChange={(checked) => updateSection(key, checked === true)}
+                                  />
+                                  <span className="font-medium text-foreground/90">
+                                    {prescriptionPdfSectionLabels[key]}
+                                  </span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </AccordionContent>
+                      </AccordionItem>
+                    ))}
+                  </Accordion>
 
                   {!sections.medications && (
                     <div className="flex gap-2 rounded-lg border border-amber-200 bg-amber-50/50 p-3 text-xs text-amber-900 animate-in fade-in-50 duration-200">

@@ -12,7 +12,9 @@ export interface IPrescriptionPdfSections {
   patientPhone: boolean;
   patientEmail: boolean;
   patientAddress: boolean;
-  encounterDetails: boolean;
+  encounterDate: boolean;
+  encounterDoctor: boolean;
+  encounterDepartment: boolean;
   complaint: boolean;
   notes: boolean;
   medications: boolean;
@@ -94,7 +96,9 @@ const PrescriptionPdfSchema = new Schema<IPrescriptionPdf>(
       patientPhone: { type: Boolean, default: true },
       patientEmail: { type: Boolean, default: true },
       patientAddress: { type: Boolean, default: true },
-      encounterDetails: { type: Boolean, default: true },
+      encounterDate: { type: Boolean, default: true },
+      encounterDoctor: { type: Boolean, default: true },
+      encounterDepartment: { type: Boolean, default: true },
       complaint: { type: Boolean, default: true },
       notes: { type: Boolean, default: true },
       medications: { type: Boolean, default: true },

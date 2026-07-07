@@ -16,7 +16,9 @@ export const prescriptionPdfSectionLabels: Record<PrescriptionPdfSectionKey, str
   patientPhone: "Patient phone",
   patientEmail: "Patient email",
   patientAddress: "Patient address",
-  encounterDetails: "Encounter date and doctor",
+  encounterDate: "Encounter date",
+  encounterDoctor: "Consultant doctor",
+  encounterDepartment: "Assigned department",
   complaint: "Complaint / diagnosis",
   notes: "Clinical notes",
   medications: "Prescription medicines",
@@ -27,19 +29,19 @@ export const prescriptionPdfSectionGroups: Array<{
   title: string;
   keys: PrescriptionPdfSectionKey[];
 }> = [
-  {
-    title: "Clinic header",
-    keys: ["clinicLogo", "clinicName", "clinicAddress", "clinicPhone", "clinicTimings"],
-  },
-  {
-    title: "Patient details",
-    keys: ["patientName", "patientDobAge", "patientGender", "patientPhone", "patientEmail", "patientAddress"],
-  },
-  {
-    title: "Medical history",
-    keys: ["encounterDetails", "complaint", "notes", "followupDate", "medications"],
-  },
-];
+    {
+      title: "Clinic header",
+      keys: ["clinicLogo", "clinicName", "clinicAddress", "clinicPhone", "clinicTimings"],
+    },
+    {
+      title: "Patient details",
+      keys: ["patientName", "patientDobAge", "patientGender", "patientPhone", "patientEmail", "patientAddress"],
+    },
+    {
+      title: "Medical history",
+      keys: ["encounterDate", "encounterDoctor", "encounterDepartment", "complaint", "notes", "followupDate", "medications"],
+    },
+  ];
 
 export function buildDefaultPrescriptionPdfSections(payload: PrescriptionPdfPayload): PrescriptionPdfSections {
   return {
@@ -54,7 +56,9 @@ export function buildDefaultPrescriptionPdfSections(payload: PrescriptionPdfPayl
     patientPhone: Boolean(payload.patient.phone),
     patientEmail: Boolean(payload.patient.email),
     patientAddress: Boolean(payload.patient.address),
-    encounterDetails: true,
+    encounterDate: true,
+    encounterDoctor: true,
+    encounterDepartment: true,
     complaint: Boolean(payload.encounter.complaint),
     notes: Boolean(payload.encounter.notes),
     medications: payload.prescription.medications.length > 0,
@@ -67,6 +71,6 @@ export function isPrescriptionPdfSectionAvailable(
   payload: PrescriptionPdfPayload
 ) {
   const defaults = buildDefaultPrescriptionPdfSections(payload);
-  if (key === "clinicName" || key === "patientName" || key === "encounterDetails") return true;
+  if (key === "clinicName" || key === "patientName" || key === "encounterDate" || key === "encounterDoctor" || key === "encounterDepartment") return true;
   return defaults[key];
 }

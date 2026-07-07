@@ -125,8 +125,9 @@ const styles = StyleSheet.create({
     color: "#4b5563",
     textTransform: "uppercase",
   },
-  colMed: { width: "40%" },
-  colFreq: { width: "25%" },
+  colMed: { width: "30%" },
+  colQty: { width: "15%" },
+  colFreq: { width: "20%" },
   colDur: { width: "15%" },
   colFood: { width: "20%" },
   medNameText: {
@@ -169,13 +170,25 @@ function parseFoodRelation(inst?: string) {
   }
 }
 
+function parseFrequencyText(rawFreq?: string) {
+  if (!rawFreq) return { timing: "", dosage: "" };
+  let dosage = "";
+  let timing = rawFreq;
+  if (rawFreq.includes("(") && rawFreq.endsWith(")")) {
+    const parts = rawFreq.split("(");
+    timing = parts[0].trim();
+    dosage = parts[1].slice(0, -1).trim();
+  }
+  return { timing, dosage };
+}
+
 function extractGlobalNotes(medications: any[]) {
   for (const med of medications) {
     if (med.instructions) {
       try {
         const parsed = JSON.parse(med.instructions);
         if (parsed.globalNotes) return parsed.globalNotes;
-      } catch {}
+      } catch { }
     }
   }
   return "";
@@ -238,10 +251,18 @@ export function PrescriptionPdfDocument({ payload, sections }: { payload: Prescr
         )}
 
         {/* Balanced Encounter Header Bar */}
-        {sections.encounterDetails && (
+        {(sections.encounterDate || sections.encounterDoctor || sections.encounterDepartment) && (
           <View style={styles.metaDividerBar}>
-            <Text style={styles.encounterLabel}>Encounter Checked: <Text style={styles.encounterValue}>{payload.encounter.date} {payload.encounter.time}</Text></Text>
-            <Text style={styles.encounterLabel}>Consultant Practitioner: <Text style={styles.encounterValue}>{payload.encounter.doctor} ({payload.encounter.specialty})</Text></Text>
+            {sections.encounterDate ? (
+              <Text style={styles.encounterLabel}>Date Checked: <Text style={styles.encounterValue}>{payload.encounter.date} {payload.encounter.time}</Text></Text>
+            ) : null}
+            {(sections.encounterDoctor || sections.encounterDepartment) ? (
+              <Text style={styles.encounterLabel}>
+                Consultant: <Text style={styles.encounterValue}>
+                  {[sections.encounterDoctor ? payload.encounter.doctor : "", sections.encounterDepartment ? `(${payload.encounter.specialty})` : ""].filter(Boolean).join(" ")}
+                </Text>
+              </Text>
+            ) : null}
           </View>
         )}
 
@@ -267,18 +288,23 @@ export function PrescriptionPdfDocument({ payload, sections }: { payload: Prescr
             <View>
               <View style={styles.tableHeader}>
                 <View style={styles.colMed}><Text style={styles.thText}>Medicine Formulation</Text></View>
-                <View style={styles.colFreq}><Text style={styles.thText}>Frequency Routines</Text></View>
+                <View style={styles.colQty}><Text style={styles.thText}>Quantity / Vol</Text></View>
+                <View style={styles.colFreq}><Text style={styles.thText}>Time Interval</Text></View>
                 <View style={styles.colDur}><Text style={styles.thText}>Duration</Text></View>
-                <View style={styles.colFood}><Text style={styles.thText}>Relation to Food</Text></View>
+                <View style={styles.colFood}><Text style={styles.thText}>Food</Text></View>
               </View>
-              {payload.prescription.medications.map((med, idx) => (
-                <View key={idx} style={styles.tableRow}>
-                  <View style={styles.colMed}><Text style={styles.medNameText}>{med.name}</Text></View>
-                  <View style={styles.colFreq}><Text>{med.frequency}</Text></View>
-                  <View style={styles.colDur}><Text>{med.duration}</Text></View>
-                  <View style={styles.colFood}><Text>{parseFoodRelation(med.instructions)}</Text></View>
-                </View>
-              ))}
+              {payload.prescription.medications.map((med, idx) => {
+                const { timing, dosage } = parseFrequencyText(med.frequency);
+                return (
+                  <View key={idx} style={styles.tableRow}>
+                    <View style={styles.colMed}><Text style={styles.medNameText}>{med.name}</Text></View>
+                    <View style={styles.colQty}><Text>{dosage}</Text></View>
+                    <View style={styles.colFreq}><Text>{timing}</Text></View>
+                    <View style={styles.colDur}><Text>{med.duration}</Text></View>
+                    <View style={styles.colFood}><Text>{parseFoodRelation(med.instructions)}</Text></View>
+                  </View>
+                );
+              })}
             </View>
           ) : (
             <View style={{ py: 6, borderStyle: "dashed", borderWidth: 1, borderColor: "#cbd5e1", borderRadius: 4, textAlign: "center" }}>

@@ -10,7 +10,9 @@ export interface PrescriptionPdfSections {
   patientPhone: boolean;
   patientEmail: boolean;
   patientAddress: boolean;
-  encounterDetails: boolean;
+  encounterDate: boolean;
+  encounterDoctor: boolean;
+  encounterDepartment: boolean;
   complaint: boolean;
   notes: boolean;
   medications: boolean;
