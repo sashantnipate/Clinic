@@ -1,16 +1,9 @@
 "use client";
 
 import React, { useState } from "react";
-import { MoreHorizontal, FileText, Edit, Trash2, Loader2 } from "lucide-react";
+import { FileText, Edit, Trash2, Loader2, Link as NextLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -57,39 +50,43 @@ export function RowActions({ patient, onUpdatePatient, onDeletePatient, setSelec
 
   return (
     <>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" className="h-8 w-8 p-0 hover:bg-muted rounded-md" disabled={isDeleting}>
-            {isDeleting ? (
-              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-            ) : (
-              <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
-            )}
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-44">
-          <DropdownMenuLabel>Patient Actions</DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          
-          {/* Swapped text & icon to point to Medical Records */}
-          <DropdownMenuItem className="gap-2 cursor-pointer">
-            <FileText className="h-4 w-4 text-muted-foreground" /> Medical Records
-          </DropdownMenuItem>
-          
-          {/* This item now triggers the form modal directly */}
-          <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => setEditModalOpen(true)}>
-            <Edit className="h-4 w-4 text-muted-foreground" /> Edit Profile
-          </DropdownMenuItem>
-          
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            onClick={() => setDeleteAlertOpen(true)}
-            className="gap-2 text-destructive focus:text-destructive focus:bg-destructive/10 cursor-pointer"
-          >
-            <Trash2 className="h-4 w-4" /> Delete Records
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <div className="flex items-center justify-end gap-1">
+        <TooltipProvider delayDuration={200}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              {/* Medical Records Link / Action */}
+              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary shrink-0" onClick={() => { }}>
+                <FileText className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Medical Records</TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary shrink-0" onClick={() => setEditModalOpen(true)}>
+                <Edit className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Edit Profile</TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 shrink-0"
+                disabled={isDeleting}
+                onClick={() => setDeleteAlertOpen(true)}
+              >
+                {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Delete Records</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </div>
 
       {/* Danger Zone Deletion Confirmation Alert */}
       <AlertDialog open={deleteAlertOpen} onOpenChange={setDeleteAlertOpen}>

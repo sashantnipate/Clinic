@@ -35,7 +35,7 @@ export function SectionsList({ isLoading, sections, onToggleActive, onEdit, onDe
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+    <div className="flex flex-col gap-4 w-full">
       {sections.map((section) => (
         <SectionCard
           key={section._id}

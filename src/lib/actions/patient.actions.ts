@@ -140,7 +140,7 @@ export async function getPatients(token: string, params: any = {}) {
     const skipIndex = (page - 1) * limit;
 
     const [patients, totalRecords] = await Promise.all([
-      Patient.find(query).sort(sortOpt).skip(skipIndex).limit(limit).lean(),
+      Patient.find(query).populate("sharedWithOrgs", "_id name slug imageUrl").sort(sortOpt).skip(skipIndex).limit(limit).lean(),
       Patient.countDocuments(query)
     ]);
 

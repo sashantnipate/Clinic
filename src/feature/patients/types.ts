@@ -6,6 +6,7 @@ export interface Patient {
   dob: string;
   gender: string;
   createdAt: string;
+  sharedWithOrgs?: { _id: string; name: string; imageUrl?: string; slug?: string }[];
 }
 
 export interface VisibleColumns {

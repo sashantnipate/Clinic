@@ -60,7 +60,8 @@ export function usePatientsTable(itemsPerPage = 10) {
             gender: p.gender,
             createdAt: new Date(p.createdAt).toLocaleDateString("en-GB"),
             customSections: p.customSections,
-            customData: p.customData
+            customData: p.customData,
+            sharedWithOrgs: p.sharedWithOrgs
           }));
           setPatients(formattedPatients);
           setTotalRecords(result.totalRecords || 0);
