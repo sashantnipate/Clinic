@@ -71,7 +71,7 @@ export function PatientProfileDashboard({ patient, ageText }: PatientProfileDash
           <PrimaryAndCustomDetails patient={patient} />
         )}
         {activeTab === "history" && (
-          <MedicalHistoryPlaceholder />
+          <MedicalHistoryPlaceholder patientName={patient.name} patientDetails={`${patient.gender} • ${ageText}`} />
         )}
         {activeTab === "share" && (
           <ShareWorkspacePanel patient={patient} />

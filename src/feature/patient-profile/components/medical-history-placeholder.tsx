@@ -4,11 +4,13 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
-import { Maximize2, Minimize2, GitBranchPlus, Loader2, Plus, User, FileText, CalendarRange, FileDown, Edit } from "lucide-react";
-import { getPatientClinicalTimeline } from "@/lib/actions/medical-history.actions";
+import { Maximize2, Minimize2, GitBranchPlus, Loader2, Plus, User, FileText, CalendarRange, FileDown, Edit, Trash2 } from "lucide-react";
+import { getPatientClinicalTimeline, deletePatientMedicalHistoryAction } from "@/lib/actions/medical-history.actions";
 import { LogEncounterModal } from "./log-encounter-modal";
 import { PrescriptionExportDialog } from "@/feature/prescription-pdf/components/prescription-export-dialog";
 import { toast } from "sonner";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { useMedicalHistoryExport } from "@/feature/medical-history-pdf/hooks/use-medical-history-export";
 
 interface TimelineNode {
   _id?: string;
@@ -35,7 +37,7 @@ interface ConnectionLine {
   isStart?: boolean;
 }
 
-export function MedicalHistoryPlaceholder() {
+export function MedicalHistoryPlaceholder({ patientName = "Unknown", patientDetails = "" }: { patientName?: string, patientDetails?: string }) {
   const params = useParams();
   const patientId = params.patientId as string;
 
@@ -43,6 +45,9 @@ export function MedicalHistoryPlaceholder() {
   const [modalOpen, setModalOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const { exportMedicalHistoryPdf, isExporting } = useMedicalHistoryExport();
 
   const [selectedParentId, setSelectedParentId] = useState<string>("");
   const [selectedExportEncounterId, setSelectedExportEncounterId] = useState<string>("");
@@ -78,6 +83,24 @@ export function MedicalHistoryPlaceholder() {
   useEffect(() => {
     loadTimelineRecords();
   }, [loadTimelineRecords]);
+
+  const handleDeleteAllRecords = async () => {
+    setIsDeleting(true);
+    try {
+      const token = localStorage.getItem("clinic_jwt") || "";
+      const res = await deletePatientMedicalHistoryAction(token, patientId);
+      if (res.success) {
+        toast.success(res.message);
+        loadTimelineRecords(); // Refresh the list
+      } else {
+        toast.error(res.error || "Failed to delete medical records.");
+      }
+    } catch (e) {
+      toast.error("An error occurred while deleting the medical history.");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const handleBranchFromNode = (node: TimelineNode) => {
     setSelectedParentId(node.nodeId);
@@ -252,6 +275,40 @@ export function MedicalHistoryPlaceholder() {
             {isFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
             {isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
           </Button>
+
+          <Button
+            variant="secondary"
+            size="sm"
+            className="h-8 text-xs gap-1.5"
+            onClick={() => exportMedicalHistoryPdf(patientId, patientName, patientDetails)}
+            disabled={isExporting || timeline.length === 0}
+          >
+            {isExporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileDown className="h-3.5 w-3.5" />}
+            Export PDF
+          </Button>
+
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="destructive" size="sm" className="h-8 text-xs gap-1.5" disabled={timeline.length === 0 || isDeleting}>
+                {isDeleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                Delete Records
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This action cannot be undone. This will permanently delete all medical encounters, prescriptions, and clinical history for this patient.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDeleteAllRecords} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                  Delete All Records
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
 
           <Button size="sm" className="h-8 text-xs gap-1.5" onClick={() => {
             setSelectedParentId("");

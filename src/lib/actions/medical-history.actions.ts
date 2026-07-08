@@ -177,3 +177,57 @@ export async function updateClinicalEncounterAction(token: string, encounterId: 
     return { success: false, error: error.message };
   }
 }
+
+export async function deletePatientMedicalHistoryAction(token: string, patientId: string) {
+  try {
+    const session = await verifyJWTString(token);
+    if (!session) return { success: false, error: "Unauthorized" };
+
+    await connectToDB();
+
+    const orgId = new mongoose.Types.ObjectId(session.ownerOrgId);
+    const patId = new mongoose.Types.ObjectId(patientId);
+
+    // Delete all medical encounters
+    await MedicalEncounter.deleteMany({ ownerOrgId: orgId, patientId: patId });
+
+    // Delete all related prescriptions
+    await Prescription.deleteMany({ patientId: patId });
+
+    return { success: true, message: "All medical records for this patient have been permanently deleted." };
+  } catch (error: any) {
+    console.error("Failed to sequence complete medical history void trace:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function getPatientMedicalHistoryExportAction(token: string, patientId: string) {
+  try {
+    const session = await verifyJWTString(token);
+    if (!session) return { success: false, error: "Unauthorized" };
+
+    await connectToDB();
+    const patId = new mongoose.Types.ObjectId(patientId);
+    const orgId = new mongoose.Types.ObjectId(session.ownerOrgId);
+
+    // Get the patient record to show in PDF
+    // We import Patient model from db if needed, or we just rely on UI passing patient details
+    // But backend can fetch the encounters and their prescriptions
+    const encounters = await MedicalEncounter.find({ ownerOrgId: orgId, patientId: patId }).sort({ createdAt: 1 }).lean();
+    const prescriptions = await Prescription.find({ patientId: patId }).lean();
+
+    // Stitch prescriptions onto encounters
+    const stitched = encounters.map((enc: any) => {
+      const rx = prescriptions.find((p: any) => p.encounterId.toString() === enc._id.toString());
+      return {
+        ...enc,
+        prescription: rx ? rx : null
+      };
+    });
+
+    return { success: true, data: JSON.parse(JSON.stringify(stitched)) };
+  } catch (error: any) {
+    console.error("Failed to compile full patient medical trace:", error);
+    return { success: false, error: error.message };
+  }
+}
