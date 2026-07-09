@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { useRouter } from "next/navigation";
 import { FileText, Edit, Trash2, Loader2, Link as NextLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -26,6 +27,7 @@ interface RowActionsProps {
 }
 
 export function RowActions({ patient, onUpdatePatient, onDeletePatient, setSelectedIds }: RowActionsProps) {
+  const router = useRouter();
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteAlertOpen, setDeleteAlertOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -55,7 +57,7 @@ export function RowActions({ patient, onUpdatePatient, onDeletePatient, setSelec
           <Tooltip>
             <TooltipTrigger asChild>
               {/* Medical Records Link / Action */}
-              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary shrink-0" onClick={() => { }}>
+              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary shrink-0" onClick={() => router.push(`/patients/${patient.id}`)}>
                 <FileText className="h-4 w-4" />
               </Button>
             </TooltipTrigger>

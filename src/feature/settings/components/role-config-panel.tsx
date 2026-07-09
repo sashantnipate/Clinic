@@ -297,8 +297,8 @@ export function RoleConfigPanel() {
                 {isSaving
                   ? "Persisting changes..."
                   : editingRoleId
-                  ? "Update Blueprint"
-                  : "Deploy Role Blueprint"}
+                    ? "Update Blueprint"
+                    : "Deploy Role Blueprint"}
               </Button>
             </DialogFooter>
           </form>

@@ -21,11 +21,11 @@ export function useMedicalHistoryExport() {
                 // Generate PDF Document
                 const blob = await pdf(
                     <MedicalHistoryPdfDocument
-            patientName={ patientName }
-            patientDetails = { patientDetails }
-            encounters = { encounters }
+                        patientName={patientName}
+                        patientDetails={patientDetails}
+                        encounters={encounters}
                     />
-        ).toBlob();
+                ).toBlob();
 
                 // Download logic
                 const url = URL.createObjectURL(blob);

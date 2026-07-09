@@ -2,6 +2,7 @@
 
 import { connectToDB } from "@/database/db";
 import { Patient } from "@/database/models/patient.model";
+import { MedicalEncounter, Prescription } from "@/database/models/medical-history.model";
 import { verifyJWTString } from "./auth.actions";
 import mongoose from "mongoose";
 import { Organization } from "@/database/models/organization.model";
@@ -210,6 +211,15 @@ export async function deletePatientRecord(token: string, id: string) {
     if (result.deletedCount === 0) {
       return { success: false, error: "Patient not found or unauthorized to delete." };
     }
+
+    // Cascade delete related records
+    await MedicalEncounter.deleteMany({
+      ownerOrgId: new mongoose.Types.ObjectId(session.ownerOrgId),
+      patientId: new mongoose.Types.ObjectId(id)
+    });
+    await Prescription.deleteMany({
+      patientId: new mongoose.Types.ObjectId(id)
+    });
 
     return { success: true };
   } catch (error: any) {

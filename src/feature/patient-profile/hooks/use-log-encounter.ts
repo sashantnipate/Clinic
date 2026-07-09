@@ -194,7 +194,7 @@ export function useLogEncounter({
 
       let calculatedLane: "center-trunk" | "left-branch" | "right-branch" = "center-trunk";
       if (type === "followup" || type === "merge") {
-        calculatedLane = ["General", "Cardiology", "Dermatology"].includes(specialty) ? "left-branch" : "right-branch";
+        calculatedLane = ["General", "Cardiology", "Dermatology"].includes(specialty || "") ? "left-branch" : "right-branch";
       }
 
       let parents = selectedParentId ? [selectedParentId] : [];
